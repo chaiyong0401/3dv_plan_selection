@@ -103,6 +103,15 @@
 - **안전**: 잔차 z는 비대칭으로 자름(내리기 작게, 들기 크게). 힘 상한은 임피던스 강성으로.
 - **크기 축소**: z 회복 동작은 짧고 드물어 0으로 학습될 위험 → 교정 구간 가중치 또는 크기·방향 분리.
 
+## 11-19 시뮬레이터 결과
+
+| 실험 | 결과 |
+|---|---|
+| C1 보정기 끔/켬, 3 seed (`resoff3_20261119`) | 성공 213 → 475 / 600 (+43.7pp [39.2, 48.3]), 오경보(FPR) 0.898 → 0.300, AUROC 0.572 → 0.871, RMST 482.6 → 284.2. 모든 seed 같은 방향, 사전등록 예측 R1–R5 적중 |
+| 실로봇 실행기 재현 확인 (`rrval2_20261119`) | `realrobot/` 실행기를 시뮬레이터에 붙여 seed 21: 154 vs 기준 160 / 200, 같은 장면 178, RMST 296 vs 280, 명령 첫 차이 3번째 스텝 1e-3 → **근접(CLOSE)**, 경계값 |
+
+`rr_server.py`: 종료 규칙(evid k, fallback)과 정지 방식을 설정 파일에서 읽도록 변경, 기본값은 현재 시스템(막기만, 3 mm 정지).
+
 ## 시뮬레이터 실행 설정 (참고)
 
 서버: `--select-k 16 --select-horizon 24 --select-rule learned_q --no-clip-sample --evid-theta 1.0 --evid-k 999 --evid-suppress --evid-fallback 2 --coh-lambda 0.02 --coh-steps 4 --coh-delay 2 --extended-obs-mode growing`

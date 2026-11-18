@@ -33,8 +33,12 @@ def main():
     a = ap.parse_args(); cfg = json.load(open(a.config))
     core = PolicyCore(cfg['ldp_ckpt'], cfg['at_ckpt'], cfg['verifier_ckpts'], evid_est=cfg.get('evid_est'), n_envs=a.n_envs,
                       coh=dict(lam=float(cfg.get('coh_lambda', 0.02)), m=4, d=int(cfg.get('delay', 2))),
-                      evid=(None if not cfg.get('evid_est') else dict(k=2, perm_k=-1, theta=1.0, suppress=True, fallback=2)),
-                      stall=dict(mode=cfg.get('stall_mode', 'ratio'), ratio=float(cfg.get('stall_ratio', 0.148)), mm=0.003))
+                      # 11-19: rule from the config, default = current system (blocking only: k 999, fallback 2). The 11-16
+                      # validation configs (rrval_20261116) ran the old belief rule k 2; set "evid_k": 2 to reproduce them.
+                      evid=(None if not cfg.get('evid_est') else dict(k=int(cfg.get('evid_k', 999)), perm_k=-1, theta=1.0, suppress=True,
+                                                                     fallback=int(cfg.get('evid_fallback', 2)))),
+                      stall=dict(mode=cfg.get('stall_mode', 'mm'), ratio=float(cfg.get('stall_ratio', 0.148)), mm=0.003),
+                      **({'arm': cfg['arm']} if cfg.get('arm') else {}))
     srv = socket.socket(socket.AF_INET, socket.SOCK_STREAM); srv.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
     srv.bind(('127.0.0.1', a.port)); srv.listen(1)
     print(f'[rr_server] listening on 127.0.0.1:{a.port} realtime={a.realtime} clip_sample disabled={cfg.get("no_clip", True)}', file=sys.stderr, flush=True)
