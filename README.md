@@ -46,6 +46,7 @@
 | `train/rz_errhead/train_err2.py` | yaw 오차 헤드 errnet 학습 (ê = 15·tanh, 부호 있는 yaw 오차를 가까운 180°로 접은 값, 도). 학습 행 = 보정 구간 & \|오차\| ≤ 15° |
 | `train/rz_errhead/train_err.py` | (기각) ê + 게이트 한 망 |
 | `train/b2_linres/fit.py` | B-2 선형 부호 모델 |
+| `realrobot/` | 실로봇 실행 프로그램: 정책 코어(선택·규칙·평가 방식 A0–A6), 실시간 루프(지연 맞춤), 6축 잔차 어댑터(ER3·z 비대칭 자르기), 기록기, 3D 마우스 넘겨받기, XELA 8값. CPU 시험 `test_realrobot_20261119.py`. 로봇 명령은 보낸 적 없음 |
 | `rdp_patch/` | reactive_diffusion_policy 포크 변경분(`rdp_fork_tracked.patch`, 기준 커밋 `BASE_COMMIT.txt`) + AT/태스크 설정 |
 
 ## rz(yaw) 보정에 대해 알게 된 것 (시뮬레이터, 11-18)
