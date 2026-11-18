@@ -1,0 +1,2055 @@
+diff --git a/reactive_diffusion_policy/common/ensemble.py b/reactive_diffusion_policy/common/ensemble.py
+index 6578187..f8bb012 100644
+--- a/reactive_diffusion_policy/common/ensemble.py
++++ b/reactive_diffusion_policy/common/ensemble.py
+@@ -67,19 +67,19 @@ class EnsembleBuffer:
+         Get ensembled action from buffer.
+         """
+         if self.timestep - self.actions_start_timestep >= len(self.actions):
+-            return None      # no data
++            return None      # no data, 실행할 수 있는 action이 없음(현재 timestep 보다 늦게 들어온 action이 없으면)
+         while self.actions_start_timestep < self.timestep:
+-            self.actions.popleft()
++            self.actions.popleft()         # buffer에서 오래된 action을 제거하면서 actions_stat_timestep을 self.timestep까지 증가 
+             self.actions_timestep.popleft()
+             self.actions_start_timestep += 1
+         actions = self.actions[0]
+         actions_timestep = self.actions_timestep[0]
+         if actions == []:
+             return None      # no data
+-        sorted_actions = sorted(zip(actions_timestep, actions))
++        sorted_actions = sorted(zip(actions_timestep, actions)) # action들을 action_timestep 기준으로 정렬
+         all_actions = np.array([x for _, x in sorted_actions])
+         all_timesteps = np.array([t for t, _ in sorted_actions])
+-        if self.mode == "new":
++        if self.mode == "new":  # 가장 최근에 들어온 action(default)
+             action = all_actions[-1]
+         elif self.mode == "old":
+             action = all_actions[0]
+diff --git a/reactive_diffusion_policy/config/train_at_workspace.yaml b/reactive_diffusion_policy/config/train_at_workspace.yaml
+index 80eef65..bc501f7 100644
+--- a/reactive_diffusion_policy/config/train_at_workspace.yaml
++++ b/reactive_diffusion_policy/config/train_at_workspace.yaml
+@@ -36,6 +36,32 @@ policy:
+   vqvae_groups: ${at.policy.vqvae_groups}
+   eval: ${at.policy.eval}
+   act_scale: ${at.policy.act_scale}
++  # These were added to the at/*.yaml files and silently ignored: this block
++  # enumerates keys rather than merging at.policy, so anything not listed here
++  # never reaches the VAE. Defaults keep every existing at config unchanged.
++  contact_weight: ${oc.select:at.policy.contact_weight,0.0}
++  contact_quantile: ${oc.select:at.policy.contact_quantile,0.4}
++  latent_noise: ${oc.select:at.policy.latent_noise,0.0}
++  # structured residual latent (model.py, xobs 2026-10-04); defaults = off
++  n_res_dims: ${oc.select:at.policy.n_res_dims,0}
++  res_kl_multiplier: ${oc.select:at.policy.res_kl_multiplier,0.01}
++  res_sup_key: ${oc.select:at.policy.res_sup_key,null}
++  res_sup_weight: ${oc.select:at.policy.res_sup_weight,0.0}
++  res_sup_center: ${oc.select:at.policy.res_sup_center,0.5}
++  res_sup_scale: ${oc.select:at.policy.res_sup_scale,0.015}
++  res_sup_rel_key: ${oc.select:at.policy.res_sup_rel_key,null}
++  res_pred_weight: ${oc.select:at.policy.res_pred_weight,0.0}
++  # structured AT latent (AT-S, model/vae/structured_latent.py, PiH 2026-10-05); defaults = off
++  struct_reg_weight: ${oc.select:at.policy.struct_reg_weight,0.0}
++  struct_ctrl_weight: ${oc.select:at.policy.struct_ctrl_weight,0.0}
++  struct_channel: ${oc.select:at.policy.struct_channel,0}
++  struct_exec_start: ${oc.select:at.policy.struct_exec_start,3}
++  struct_exec_steps: ${oc.select:at.policy.struct_exec_steps,12}
++  struct_x_mean: ${oc.select:at.policy.struct_x_mean,0.0}
++  struct_x_std: ${oc.select:at.policy.struct_x_std,1.0}
++  struct_k: ${oc.select:at.policy.struct_k,1.0}
++  struct_delta_max: ${oc.select:at.policy.struct_delta_max,1.25}
++  struct_leak_weight: ${oc.select:at.policy.struct_leak_weight,1.0}
+ 
+ dataloader:
+   batch_size: 64
+diff --git a/reactive_diffusion_policy/config/train_latent_diffusion_unet_real_image_workspace.yaml b/reactive_diffusion_policy/config/train_latent_diffusion_unet_real_image_workspace.yaml
+index 4ef21cf..8e00458 100644
+--- a/reactive_diffusion_policy/config/train_latent_diffusion_unet_real_image_workspace.yaml
++++ b/reactive_diffusion_policy/config/train_latent_diffusion_unet_real_image_workspace.yaml
+@@ -14,7 +14,12 @@ horizon: ${at.horizon}
+ n_obs_steps: ${at.n_obs_steps}
+ n_action_steps: 8
+ n_latency_steps: 0
+-obs_temporal_downsample_ratio: 2
++# derived, not hardcoded: this is the ratio passed to predict_action, which uses
++# it as To = n_obs_steps * ratio to locate "now" in the action chunk. Pinning it
++# at 2 while the dataset takes its own ratio from the AT config lets the two
++# desync the moment an AT config changes the ratio -- the observation window
++# would be built one way and the action slice indexed another.
++obs_temporal_downsample_ratio: ${at.dataset_obs_temporal_downsample_ratio}
+ dataset_obs_steps: ${eval:'${at.n_obs_steps}*${at.dataset_obs_temporal_downsample_ratio}'} # for latent diffusion policy with 24fps
+ dataset_obs_temporal_downsample_ratio: ${at.dataset_obs_temporal_downsample_ratio}
+ past_action_visible: False
+@@ -148,6 +153,8 @@ policy:
+     eval: true
+     load_dir: ${at_load_dir}
+     act_scale: ${at.policy.act_scale}
++    # must match the AT checkpoint: z_res channels are time-averaged inside quant_state_without_vq
++    n_res_dims: ${oc.select:at.policy.n_res_dims,0}
+ 
+   horizon: ${horizon}
+   n_action_steps: ${eval:'${n_action_steps}+${n_latency_steps}'}
+diff --git a/reactive_diffusion_policy/dataset/real_image_tactile_dataset.py b/reactive_diffusion_policy/dataset/real_image_tactile_dataset.py
+index 99fb3c5..aa68ee2 100644
+--- a/reactive_diffusion_policy/dataset/real_image_tactile_dataset.py
++++ b/reactive_diffusion_policy/dataset/real_image_tactile_dataset.py
+@@ -33,8 +33,12 @@ class RealImageTactileDataset(BaseImageDataset):
+                  max_train_episodes=None,
+                  delta_action=False,
+                  relative_action=False,
++                 chunk_relative_action=False,
+                  relative_tcp_obs_for_relative_action=True,
+                  transform_params=None,
++                 exclude_current_phase=None,
++                 normalizer_source_keep=None,
++                 relative_action_form=None,   # relform_s1_20261114: None (upstream) | 'inc' | 'lead' (see common/relform_20261114.py); needs relative_action
+                  ):
+         assert os.path.isdir(dataset_path)
+ 
+@@ -59,7 +63,9 @@ class RealImageTactileDataset(BaseImageDataset):
+                 extended_lowdim_keys.append(key)
+ 
+         zarr_path = os.path.join(dataset_path, 'replay_buffer.zarr')
+-        zarr_load_keys = set(rgb_keys + lowdim_keys + extended_rgb_keys + extended_lowdim_keys + ['action'])
++        assert relative_action_form in (None, 'inc', 'lead') and (relative_action_form is None or relative_action)
++        self.relative_action_form = relative_action_form
++        zarr_load_keys = set(rgb_keys + lowdim_keys + extended_rgb_keys + extended_lowdim_keys + ['action'] + (['action_delta'] if relative_action_form == 'lead' else []))
+         zarr_load_keys = list(filter(lambda key: "wrt" not in key, zarr_load_keys))
+         replay_buffer = ReplayBuffer.copy_from_path(
+             zarr_path, keys=zarr_load_keys)
+@@ -83,6 +89,7 @@ class RealImageTactileDataset(BaseImageDataset):
+             replay_buffer['action'][:] = actions_diff
+         
+         self.relative_action = relative_action
++        self.chunk_relative_action = chunk_relative_action
+         self.relative_tcp_obs_for_relative_action = relative_tcp_obs_for_relative_action
+         self.transforms = RealWorldTransforms(option=transform_params)
+ 
+@@ -113,6 +120,25 @@ class RealImageTactileDataset(BaseImageDataset):
+             episode_mask=train_mask,
+             key_first_k=key_first_k)
+         
++        # dagger_r3full_20261011 Stage B: drop samples whose current frame (last obs frame, idx + n_obs_steps - 1)
++        # has a phase in exclude_current_phase (phase 0 = pre-trigger policy context: observation history only).
++        self.exclude_current_phase = None
++        if exclude_current_phase is not None:
++            import zarr
++            phase = zarr.open(zarr_path, 'r')['data/phase'][:]
++            self.exclude_current_phase = np.atleast_1d(np.asarray(exclude_current_phase, dtype=phase.dtype))
++            self._cur_phase = phase
++            self._cur_offset = (n_obs_steps if n_obs_steps is not None else 1) - 1
++            sampler.indices = self._filter_current_phase(sampler.indices)
++
++        # usb_keyed_normsplit_20261104: opt-in, fit the replay-buffer normalizers (action / low-dim obs) only on frames whose
++        # data/source is in normalizer_source_keep; samples and loss are unchanged. Default None = unchanged.
++        self._norm_mask = None
++        if normalizer_source_keep is not None:
++            import zarr
++            src = zarr.open(zarr_path, 'r')['data/source'][:]
++            self._norm_mask = np.isin(src, np.atleast_1d(np.asarray(normalizer_source_keep)))
++
+         self.replay_buffer = replay_buffer
+         self.sampler = sampler
+         self.shape_meta = shape_meta
+@@ -128,6 +154,12 @@ class RealImageTactileDataset(BaseImageDataset):
+         self.pad_before = pad_before
+         self.pad_after = pad_after
+ 
++    def _filter_current_phase(self, indices):
++        if len(indices) == 0:
++            return indices
++        cur = indices[:, 0] - indices[:, 2] + self._cur_offset          # absolute index of the current frame
++        return indices[~np.isin(self._cur_phase[cur], self.exclude_current_phase)]
++
+     def get_validation_dataset(self):
+         val_set = copy.copy(self)
+         val_set.sampler = SequenceSampler(
+@@ -137,9 +169,15 @@ class RealImageTactileDataset(BaseImageDataset):
+             pad_after=self.pad_after,
+             episode_mask=self.val_mask
+             )
++        if self.exclude_current_phase is not None:
++            val_set.sampler.indices = self._filter_current_phase(val_set.sampler.indices)
+         val_set.val_mask = ~self.val_mask
+         return val_set
+ 
++    def _nrb(self, key):
++        x = self.replay_buffer[key]
++        return x if getattr(self, '_norm_mask', None) is None else x[:][self._norm_mask]
++
+     def get_normalizer(self, **kwargs) -> LinearNormalizer:
+         normalizer = LinearNormalizer()
+ 
+@@ -165,7 +203,7 @@ class RealImageTactileDataset(BaseImageDataset):
+         if self.relative_action:
+             action_all = relative_data_dict['action']
+         else:
+-            action_all = self.replay_buffer['action'][:, :self.shape_meta['action']['shape'][0]]
++            action_all = self._nrb('action')[:, :self.shape_meta['action']['shape'][0]]
+ 
+         normalizer['action'] = get_action_normalizer(action_all)
+ 
+@@ -176,10 +214,10 @@ class RealImageTactileDataset(BaseImageDataset):
+             elif 'robot_tcp_pose' in key and 'wrt' in key:
+                 normalizer[key] = get_action_normalizer(inter_gripper_data_dict[key])
+             elif 'robot_tcp_pose' in key and 'wrt' not in key:
+-                normalizer[key] = get_action_normalizer(self.replay_buffer[key][:, :self.shape_meta['obs'][key]['shape'][0]])
++                normalizer[key] = get_action_normalizer(self._nrb(key)[:, :self.shape_meta['obs'][key]['shape'][0]])
+             else:
+                 normalizer[key] = SingleFieldLinearNormalizer.create_fit(
+-                    self.replay_buffer[key][:, :self.shape_meta['obs'][key]['shape'][0]])
++                    self._nrb(key)[:, :self.shape_meta['obs'][key]['shape'][0]])
+ 
+         for key in list(set(self.extended_lowdim_keys)):
+             if key in self.lowdim_keys:
+@@ -191,10 +229,10 @@ class RealImageTactileDataset(BaseImageDataset):
+                 elif 'robot_tcp_pose' in key and 'wrt' in key:
+                     normalizer[key] = get_action_normalizer(inter_gripper_data_dict[key])
+                 elif 'robot_tcp_pose' in key and 'wrt' not in key: # not used now
+-                    normalizer[key] = get_action_normalizer(self.replay_buffer[key][:, :self.shape_meta['extended_obs'][key]['shape'][0]])
++                    normalizer[key] = get_action_normalizer(self._nrb(key)[:, :self.shape_meta['extended_obs'][key]['shape'][0]])
+                 else:
+                     normalizer[key] = SingleFieldLinearNormalizer.create_fit(
+-                        self.replay_buffer[key][:, :self.shape_meta['extended_obs'][key]['shape'][0]])
++                        self._nrb(key)[:, :self.shape_meta['extended_obs'][key]['shape'][0]])
+ 
+         # image
+         for key in list(set(self.rgb_keys + self.extended_rgb_keys)):
+@@ -222,9 +260,12 @@ class RealImageTactileDataset(BaseImageDataset):
+         for key in self.rgb_keys:
+             # move channel last to channel first
+             # T,H,W,C
+-            # convert uint8 image to float32
++            # real-robot captures are stored as uint8 [0,255] and need
++            # rescaling; sim sources (e.g. manifeel) already store
++            # float32 images in [0,1], so only rescale uint8 sources.
++            img_scale = 255. if data[key].dtype == np.uint8 else 1.
+             obs_dict[key] = np.moveaxis(data[key][T_slice][::-obs_downsample_ratio][::-1],-1,1
+-                ).astype(np.float32) / 255.
++                ).astype(np.float32) / img_scale
+             # T,C,H,W
+             # save ram
+             if key not in self.rgb_keys:
+@@ -244,26 +285,45 @@ class RealImageTactileDataset(BaseImageDataset):
+         
+         extended_obs_dict = dict()
+         for key in self.extended_rgb_keys:
++            img_scale = 255. if data[key].dtype == np.uint8 else 1.
+             extended_obs_dict[key] = np.moveaxis(data[key],-1,1
+-                ).astype(np.float32) / 255.
++                ).astype(np.float32) / img_scale
+             del data[key]
+         for key in self.extended_lowdim_keys:
+             if 'wrt' not in key:
+                 extended_obs_dict[key] = data[key][:, :self.shape_meta['extended_obs'][key]['shape'][0]].astype(np.float32)
+                 del data[key]
+ 
+-        action = data['action'][:, :self.shape_meta['action']['shape'][0]].astype(np.float32)
++        _form = getattr(self, 'relative_action_form', None)
++        action = (data['action'][:, :9] if _form == 'inc' else data['action_delta'][:, :6] if _form == 'lead' else data['action'][:, :self.shape_meta['action']['shape'][0]]).astype(np.float32)
+         # handle latency by dropping first n_latency_steps action
+         # observations are already taken care of by T_slice
+         if self.n_latency_steps > 0:
+             action = action[self.n_latency_steps:]
+-        
++
++        if self.chunk_relative_action:
++            # Our action is a per-step delta command, i.e. the DERIVATIVE of the
++            # trajectory. Upstream stores absolute TCP poses and converts them to
++            # the current frame, which yields cumulative displacement from now.
++            # Integrating here puts us in the same representation: measured on our
++            # own demos it takes the chunk from 93 principal components for 99% of
++            # the variance down to 10, and the step-to-step energy ratio from
++            # 0.424 to 0.016 -- upstream's peel chunks sit at 5 and 0.017.
++            action = np.cumsum(action, axis=0)
++
+         if self.relative_action:
+             base_absolute_action = np.concatenate([
+                 obs_dict['left_robot_tcp_pose'][-1] if 'left_robot_tcp_pose' in obs_dict else np.array([]),
+                 obs_dict['right_robot_tcp_pose'][-1] if 'right_robot_tcp_pose' in obs_dict else np.array([])
+             ], axis=-1)
+-            action = absolute_actions_to_relative_actions(action, base_absolute_action=base_absolute_action)
++            if _form == 'lead':
++                from reactive_diffusion_policy.common.relform_20261114 import cmd_to_lead
++                action = cmd_to_lead(action, base_absolute_action)
++            else:
++                action = absolute_actions_to_relative_actions(action, base_absolute_action=base_absolute_action)
++                if _form == 'inc':
++                    from reactive_diffusion_policy.common.relform_20261114 import rel_to_inc
++                    action = rel_to_inc(action, self.n_obs_steps - 1)   # base row = last observation row of the window
+ 
+             if self.relative_tcp_obs_for_relative_action:
+                 for key in self.lowdim_keys:
+diff --git a/reactive_diffusion_policy/dataset/real_image_tactile_latent_diffusion_dataset.py b/reactive_diffusion_policy/dataset/real_image_tactile_latent_diffusion_dataset.py
+index e72c26c..7c2669e 100644
+--- a/reactive_diffusion_policy/dataset/real_image_tactile_latent_diffusion_dataset.py
++++ b/reactive_diffusion_policy/dataset/real_image_tactile_latent_diffusion_dataset.py
+@@ -9,14 +9,23 @@ class RealImageTactileLatentDiffusionDataset(RealImageTactileDataset):
+     def __init__(self,
+                  at: VAE,
+                  use_latent_action_before_vq: bool,
++                 at_normalizer_path=None,
+                  **kwargs):
+         super().__init__(**kwargs)
+         self.at = at
+         self.at.eval()
+         self.use_latent_action_before_vq = use_latent_action_before_vq
++        # relform_s2_20261115: opt-in. Pickled LinearNormalizer the AT was trained with; its 'action' and extended-obs entries replace the ones
++        # fitted on this dataset, because the policy hands its own normalizer to the AT (policy.at.set_normalizer). Default None = unchanged.
++        self.at_normalizer_path = at_normalizer_path
+ 
+     def get_normalizer(self, **kwargs) -> LinearNormalizer:
+         normalizer = super().get_normalizer(**kwargs)
++        if self.at_normalizer_path is not None:
++            import pickle
++            atn = pickle.load(open(self.at_normalizer_path, 'rb'))
++            for key in ['action'] + list(self.shape_meta.get('extended_obs', {}).keys()):
++                normalizer[key] = atn[key]
+ 
+         latent_action_all = []
+ 
+diff --git a/reactive_diffusion_policy/env/real_bimanual/real_env.py b/reactive_diffusion_policy/env/real_bimanual/real_env.py
+index 0dbe367..5806d1f 100644
+--- a/reactive_diffusion_policy/env/real_bimanual/real_env.py
++++ b/reactive_diffusion_policy/env/real_bimanual/real_env.py
+@@ -345,6 +345,7 @@ class RealRobotEnvironment(Node):
+             A dictionary containing stacked observations
+         """
+         # Get last n*ratio observations to ensure we have enough samples after downsampling
++        # obs_buffer에 최근에 들어온 observation들을 누적하고 있음 
+         last_n_obs_list, _ = self.obs_buffer.peek_last_n(
+             obs_steps * temporal_downsample_ratio)  # newest to oldest
+ 
+diff --git a/reactive_diffusion_policy/env_runner/real_runner.py b/reactive_diffusion_policy/env_runner/real_runner.py
+index aa4b6c1..b73e486 100644
+--- a/reactive_diffusion_policy/env_runner/real_runner.py
++++ b/reactive_diffusion_policy/env_runner/real_runner.py
+@@ -34,6 +34,7 @@ import psutil
+ from copy import deepcopy
+ 
+ # add this to prevent assigning too may threads when using numpy
++# 각 library 별ㄹ 최대 12개 제한 
+ os.environ["OPENBLAS_NUM_THREADS"] = "12"
+ os.environ["MKL_NUM_THREADS"] = "12"
+ os.environ["NUMEXPR_NUM_THREADS"] = "12"
+@@ -78,8 +79,8 @@ class RealRunner:
+                  inference_fps: float = 6,
+                  latency_step: int = 0,
+                  gripper_latency_step: Optional[int] = None,
+-                 n_obs_steps: int = 2,
+-                 obs_temporal_downsample_ratio: int = 2,
++                 n_obs_steps: int = 2,  # 몇 개의 시점을 stack할지
++                 obs_temporal_downsample_ratio: int = 2,    # obs 샘플간 간격 [02, 04,..]
+                  dataset_obs_temporal_downsample_ratio: int = 1,
+                  downsample_extended_obs: bool = True,
+                  enable_video_recording: bool = False,
+@@ -290,11 +291,13 @@ class RealRunner:
+         action_all = np.concatenate([left_action, right_action], axis=-1)
+         return (action_all, is_bimanual)
+ 
++    # use_mcy 
+     def action_command_thread(self, policy: Union[DiffusionUnetImagePolicy], stop_event):
+-        while not stop_event.is_set():
++        while not stop_event.is_set():  # stop event 발생하기 전까지 loop 진행 
+             start_time = time.time()
+             # get step action from ensemble buffer
+-            tcp_step_action = self.tcp_ensemble_buffer.get_action()
++            # tcp_ensemble_buffer, gripper_ensemble_buffer에서 각각 가장 최근(if ensemble mode = "new") 값 가져옴
++            tcp_step_action = self.tcp_ensemble_buffer.get_action() 
+             gripper_step_action = self.gripper_ensemble_buffer.get_action()
+             if tcp_step_action is None or gripper_step_action is None:  # no action in the buffer => no movement.
+                 cur_time = time.time()
+@@ -305,12 +308,12 @@ class RealRunner:
+                 continue
+ 
+             if self.use_latent_action_with_rnn_decoder:
+-                tcp_extended_obs_step = int(tcp_step_action[-1])
++                tcp_extended_obs_step = int(tcp_step_action[-1])    # tcp, gripper의 마지막 요소(step) 추출 
+                 gripper_extended_obs_step = int(gripper_step_action[-1])
+-                tcp_step_action = tcp_step_action[:-1]
++                tcp_step_action = tcp_step_action[:-1]  # step 제외한 나머지 -> latent 
+                 gripper_step_action = gripper_step_action[:-1]
+ 
+-                longer_extended_obs_step = max(tcp_extended_obs_step, gripper_extended_obs_step)
++                longer_extended_obs_step = max(tcp_extended_obs_step, gripper_extended_obs_step) # 둘 중 더 긴 time step 사용 
+                 obs_temporal_downsample_ratio = self.obs_temporal_downsample_ratio if self.downsample_extended_obs else 1
+                 extended_obs = self.env.get_obs(longer_extended_obs_step,
+                                                     temporal_downsample_ratio= obs_temporal_downsample_ratio)
+@@ -370,8 +373,10 @@ class RealRunner:
+                 gripper_step_action = gripper_step_action[tcp_len:]
+ 
+             combined_action = np.concatenate([tcp_step_action, gripper_step_action], axis=-1)
+-            # convert to 16-D robot action (TCP + gripper of both arms)
++            # convert to 16-D robot action (TCP(left,right 6D) + gripper of both arms(left, right gripper width, force))
+             # TODO: handle rotation in temporal ensemble buffer!
++            # is_bimanual : use one hand or bi-man
++            # current gripper force is 0 (dummy) actually [TCP pose + gripper width] used 
+             step_action, is_bimanual = self.post_process_action(combined_action[np.newaxis, :])
+             step_action = step_action.squeeze(0)
+ 
+@@ -398,10 +403,11 @@ class RealRunner:
+             else:
+                 logger.error(f"Failed to stop recording video")
+ 
++    # Main Thread (#1) #############################################################################
+     def run(self, policy: Union[DiffusionUnetImagePolicy]):
+-        if self.use_latent_action_with_rnn_decoder:
++        if self.use_latent_action_with_rnn_decoder: # Latent diffusion policy
+             assert policy.at.use_rnn_decoder, "Policy should use rnn decoder for latent action."
+-        else:
++        else:   
+             assert not hasattr(policy, 'at') or not policy.at.use_rnn_decoder, "Policy should not use rnn decoder for action."
+ 
+         device = policy.device
+@@ -410,10 +416,12 @@ class RealRunner:
+         executor.add_node(self.env)
+ 
+         try:
++            # RealRobotEnvironment node를 비동기적으로 실행하는 thread spin (#2) #########################
+             spin_thread = threading.Thread(target=self.spin_executor, args=(executor,), daemon=True)
+             spin_thread.start()
+ 
+             time.sleep(2)
++            # progress bar를 보여주는 for loop 
+             for episode_idx in tqdm.tqdm(range(0, self.eval_episodes),
+                                          desc=f"Eval for {self.task_name}",
+                                          leave=False, mininterval=self.tqdm_interval_sec):
+@@ -443,14 +451,14 @@ class RealRunner:
+ 
+                 self.stop_event.clear()
+                 time.sleep(0.5)
+-                # start a new thread for action command
++                # start a new thread for action command (#3) ###############################################
+                 action_thread = threading.Thread(target=self.action_command_thread, args=(policy, self.stop_event,),
+                                                  daemon=True)
+                 action_thread.start()
+ 
+                 self.action_step_count = 0
+                 step_count = 0
+-                steps_per_inference = int(self.control_fps / self.inference_fps)
++                steps_per_inference = int(self.control_fps / self.inference_fps)    # 12 / 6 -> 2 
+                 start_timestamp = time.time()
+                 last_timestamp = start_timestamp
+                 try:
+@@ -458,7 +466,7 @@ class RealRunner:
+                         # profiler = Profiler()
+                         # profiler.start()
+                         start_time = time.time()
+-                        # get obs
++                        # get obs, 최근 n_obs_steps(2) 만큼의 obs를 temporal_downsample_ratio(1) 간격으로 획득 
+                         obs = self.env.get_obs(
+                             obs_steps=self.n_obs_steps,
+                             temporal_downsample_ratio=self.obs_temporal_downsample_ratio)
+@@ -486,7 +494,7 @@ class RealRunner:
+                         policy_time = time.time()
+                         # run policy
+                         with torch.no_grad():
+-                            if self.use_latent_action_with_rnn_decoder:
++                            if self.use_latent_action_with_rnn_decoder: # use_mcy
+                                 action_dict = policy.predict_action(obs_dict,
+                                                                     dataset_obs_temporal_downsample_ratio=self.dataset_obs_temporal_downsample_ratio,
+                                                                     return_latent_action=True)
+@@ -499,23 +507,24 @@ class RealRunner:
+                                                     lambda x: x.detach().to('cpu').numpy())
+ 
+                         action_all = np_action_dict['action'].squeeze(0)
+-                        if self.use_latent_action_with_rnn_decoder:
++                        if self.use_latent_action_with_rnn_decoder: ## we use
+                             # add first absolute action to get absolute action
+                             if self.use_relative_action:
+-                                base_absolute_action = np.concatenate([
++                                base_absolute_action = np.concatenate([ # 현재 시점의 absolute pose obs값, [-1]: 가장 최근 값 
+                                     np_absolute_obs_dict['left_robot_tcp_pose'][-1] if 'left_robot_tcp_pose' in np_absolute_obs_dict else np.array([]),
+                                     np_absolute_obs_dict['right_robot_tcp_pose'][-1] if 'right_robot_tcp_pose' in np_absolute_obs_dict else np.array([])
+                                 ], axis=-1)
+-                                action_all = np.concatenate([
+-                                    action_all,
+-                                    base_absolute_action[np.newaxis, :].repeat(action_all.shape[0], axis=0)
++                                action_all = np.concatenate([   # action all = (action_all의 각 timesteps base_absolute_action) -> shape(num_timesteps, latent_dim + left_tcp_pose_dim + right_tcp_pose_dim)
++                                    action_all, # shape(num_timesteps, latent_dim)
++                                    base_absolute_action[np.newaxis, :].repeat(action_all.shape[0], axis=0) # base_absolute_action을 action_all.shape[0](num_timesteps) 만큼 복제 -> shape(num_timesteps, left_tcp_pose_dim + right_tcp_pose_dim)
+                                 ], axis=-1)
+                             # add action step to get corresponding observation
+-                            action_all = np.concatenate([
++                            # 각 latent action timestep이 이후에 들어올 어느 시점에 대응되는지 알려주는 timestamp ###########################################################
++                            action_all = np.concatenate([  # action이 n_obs_steps 이후 timestep에 대응되므로, 이에 맞는 time index 부여 -> action all shape : [num_timestpes, latent_dim + left_tcp_pose_dim + right_tcp_pose_dim + num_timestep(1)]
+                                 action_all,
+-                                np.arange(self.n_obs_steps * self.dataset_obs_temporal_downsample_ratio, action_all.shape[0] + self.n_obs_steps * self.dataset_obs_temporal_downsample_ratio)[:, np.newaxis]
++                                np.arange(self.n_obs_steps * self.dataset_obs_temporal_downsample_ratio, action_all.shape[0] + self.n_obs_steps * self.dataset_obs_temporal_downsample_ratio)[:, np.newaxis]    #(2, num_timesteps + 2)[:,np.newaxis] -> shape (num_timesteps,1)
+                             ], axis=-1)
+-                        else:
++                        else: ## not use 
+                             if self.use_relative_action:
+                                 base_absolute_action = np.concatenate([
+                                     np_absolute_obs_dict['left_robot_tcp_pose'][-1] if 'left_robot_tcp_pose' in np_absolute_obs_dict else np.array([]),
+@@ -523,17 +532,18 @@ class RealRunner:
+                                 ], axis=-1)
+                                 action_all = relative_actions_to_absolute_actions(action_all, base_absolute_action)
+ 
+-                        if self.action_interpolation_ratio > 1:
++                        if self.action_interpolation_ratio > 1: # not use 
+                             if self.use_latent_action_with_rnn_decoder:
+                                 action_all = action_all.repeat(self.action_interpolation_ratio, axis=0)
+                             else:
+-                                action_all = interpolate_actions_with_ratio(action_all, self.action_interpolation_ratio)
++                                action_all = interpolate_actions_with_ratio(action_all, self.action_interpolation_ratio)    
+ 
+                         # TODO: only takes the first n_action_steps and add to the ensemble buffer
+-                        if step_count % self.tcp_action_update_interval == 0:
++                        # action_all 중 일부를 TCP(latent)와 gripper에 나눠서 ensemble buffer에 넣기
++                        if step_count % self.tcp_action_update_interval == 0:   # 현재 step이 TCP update 주기(6)에 도달했을 때 TCP action update
+                             if self.use_latent_action_with_rnn_decoder:
+-                                tcp_action = action_all[self.latency_step:, ...]
+-                            else:
++                                tcp_action = action_all[self.latency_step:, ...]    # latency_step = 0 -> shape : (num_timesteps, D)
++                            else:   # not use 
+                                 if action_all.shape[-1] == 4:
+                                     tcp_action = action_all[self.latency_step:, :3]
+                                 elif action_all.shape[-1] == 8:
+@@ -552,10 +562,10 @@ class RealRunner:
+                                 print("123")
+                                 self.env.get_predicted_action(tcp_action, type='full_tcp')
+ 
+-                        if step_count % self.gripper_action_update_interval == 0:
++                        if step_count % self.gripper_action_update_interval == 0: # 현재 step이 gripper update 주기(10)에 도달했을 때 gripper action update
+                             if self.use_latent_action_with_rnn_decoder:
+-                                gripper_action = action_all[self.gripper_latency_step:, ...]
+-                            else:
++                                gripper_action = action_all[self.gripper_latency_step:, ...]    # gripper_latency_step = 0 -> shape : (num_timesteps, D)
++                            else:   # not use 
+                                 if action_all.shape[-1] == 4:
+                                     gripper_action = action_all[self.gripper_latency_step:, 3:]
+                                 elif action_all.shape[-1] == 8:
+@@ -574,19 +584,19 @@ class RealRunner:
+                                 self.env.get_predicted_action(gripper_action, type='full_gripper')
+ 
+                         cur_time = time.time()
+-                        precise_sleep(max(0., self.inference_interval_time - (cur_time - start_time)))
++                        precise_sleep(max(0., self.inference_interval_time - (cur_time - start_time))) # 주어진 inference 시간(1/inferece_fps)를 초과하지 않도록 sleep 
+                         if cur_time - start_timestamp >= self.max_duration_time:
+                             logger.info(f"Episode {episode_idx} reaches max duration time {self.max_duration_time} seconds.")
+                             break
+-                        step_count += steps_per_inference
++                        step_count += steps_per_inference # step_count = step_count + 2 
+                         # profiler.stop()
+                         # profiler.print()
+ 
+                 except KeyboardInterrupt:
+                     logger.warning("KeyboardInterrupt! Terminate the episode now!")
+                 finally:
+-                    self.stop_event.set()
+-                    action_thread.join()
++                    self.stop_event.set()   
++                    action_thread.join()    # thread가 완전히 끝날 때까지 대기 
+                     if self.enable_video_recording:
+                         self.stop_record_video()
+                     self.env.save_exp(episode_idx)
+diff --git a/reactive_diffusion_policy/model/vae/model.py b/reactive_diffusion_policy/model/vae/model.py
+index 9a65d93..8a506d1 100644
+--- a/reactive_diffusion_policy/model/vae/model.py
++++ b/reactive_diffusion_policy/model/vae/model.py
+@@ -87,13 +87,13 @@ class DecoderRNN(nn.Module):
+         super(DecoderRNN, self).__init__()
+         self.rnn = nn.GRU(global_cond_dim + temporal_cond_dim, hidden_dim, layer_num, batch_first=True)
+         self.fc = nn.Linear(hidden_dim, output_dim)
+-        self.apply(weights_init_encoder)
++        self.apply(weights_init_encoder)    # 내부 모듈 weight 초기화
+ 
+     def forward(self, global_cond, temporal_cond):
+-        global_cond = global_cond.unsqueeze(1).expand(-1, temporal_cond.size(1), -1)
+-        x = torch.cat([global_cond, temporal_cond], dim=-1)
+-        x, _ = self.rnn(x)
+-        x = self.fc(x)
++        global_cond = global_cond.unsqueeze(1).expand(-1, temporal_cond.size(1), -1) # global_cond: [B,D1(global_cond_dim)], temporal_cond: [B,T,D2(temporal_cond_dim)] -> global_cond = [B,T,D1]
++        x = torch.cat([global_cond, temporal_cond], dim=-1) # x = [B,T,D1+D2]
++        x, _ = self.rnn(x)  # 각 time step에 대해 hidden state 출력 return
++        x = self.fc(x)  # [B,T,output_dim]
+         x = einops.rearrange(x, "N T A -> N (T A)")
+         return x
+ 
+@@ -119,6 +119,47 @@ class VAE:
+         load_dir=None,
+         encoder_loss_multiplier=1.0,
+         act_scale=1.0,
++        contact_weight=0.0,
++        contact_quantile=0.4,
++        latent_noise=0.0,
++        # --- structured residual latent (xobs, 2026-10-04) --------------------------------
++        # The first n_res_dims channels of the quantised latent are made time-invariant over
++        # the chunk and held apart as z_res; the rest are z_det. Downstream shapes (LDP, its
++        # latent normaliser, policy_server, bridge) do not change. Because post_quant is a
++        # 1x1 conv, moving z_res is a fixed direction in the decoder's latent space, so the
++        # bridge's --axis-file enumeration can sweep it directly.
++        #   res_kl_multiplier : KL(q(z_res|chunk) || N(0,I)) weight (prior independent of obs)
++        #   res_sup_key/...   : S1 (privileged upper bound) -- regress mean z_res onto
++        #                       (obs[res_sup_key][..., -1, 0] - center) / scale at train time only
++        #   res_pred_weight   : S2 -- a head predicts mean z_det from the current observation
++        #                       (res_pred_obs_keys); its normalised error is penalised, so what
++        #                       the observation cannot explain is pushed into z_res
++        n_res_dims=0,
++        res_kl_multiplier=1e-2,
++        res_sup_key=None,
++        res_sup_weight=0.0,
++        res_sup_center=0.5,
++        res_sup_scale=0.015,
++        # S1 target relative to the EE: the AT encoder sees only the action chunk, which encodes
++        # how far to move, never where the EE is -- so absolute socket x is unidentifiable from it
++        # (measured corr 0.30). With res_sup_rel_key='state' the target is (socket x - ee x) at now.
++        res_sup_rel_key=None,
++        res_pred_weight=0.0,
++        res_pred_obs_keys=('state', 'contact_8d_right'),
++        res_pred_obs_dims=(7, 8),
++        # --- structured AT latent (AT-S, PiH 2026-10-05; structured_latent.py) ---------------
++        # s(z) = <z_post, u>, u = post-quant channel `struct_channel` uniform over time / sqrt(T).
++        # Off unless struct_reg_weight or struct_ctrl_weight > 0; defaults leave every config unchanged.
++        struct_reg_weight=0.0,
++        struct_ctrl_weight=0.0,
++        struct_channel=0,
++        struct_exec_start=3,
++        struct_exec_steps=12,
++        struct_x_mean=0.0,
++        struct_x_std=1.0,
++        struct_k=1.0,
++        struct_delta_max=1.25,
++        struct_leak_weight=1.0,
+     ):
+         self.input_dim_h = horizon
+         self.input_dim_w = shape_meta['action']['shape'][0]
+@@ -135,6 +176,35 @@ class VAE:
+         self.device = device
+         self.encoder_loss_multiplier = encoder_loss_multiplier
+         self.act_scale = act_scale
++        self.contact_weight = contact_weight
++        self.contact_quantile = contact_quantile
++        self.latent_noise = latent_noise
++        self.n_res_dims = int(n_res_dims)
++        self.res_kl_multiplier = res_kl_multiplier
++        self.res_sup_key = res_sup_key
++        self.res_sup_weight = res_sup_weight
++        self.res_sup_center = res_sup_center
++        self.res_sup_scale = res_sup_scale
++        self.res_sup_rel_key = res_sup_rel_key
++        self.res_pred_weight = res_pred_weight
++        self.res_pred_obs_keys = list(res_pred_obs_keys)
++        self.struct_reg_weight = float(struct_reg_weight)
++        self.struct_ctrl_weight = float(struct_ctrl_weight)
++        self.struct_channel = int(struct_channel)
++        self.struct_exec_start = int(struct_exec_start)
++        self.struct_exec_steps = int(struct_exec_steps)
++        self.struct_x_mean = float(struct_x_mean)
++        self.struct_x_std = float(struct_x_std)
++        self.struct_k = float(struct_k)
++        self.struct_delta_max = float(struct_delta_max)
++        self.struct_leak_weight = float(struct_leak_weight)
++        self.struct_enabled = self.struct_reg_weight > 0 or self.struct_ctrl_weight > 0
++        if self.struct_enabled:
++            assert not use_vq and n_res_dims == 0, 'AT-S is defined on the plain continuous latent'
++            assert use_rnn_decoder and 0 <= self.struct_channel < n_latent_dims and self.struct_x_std > 0
++        if self.n_res_dims > 0:
++            assert not use_vq, 'z_res is defined on the continuous latent only'
++            assert self.n_res_dims < n_embed, 'z_det needs at least one channel'
+ 
+         self.normalizer = LinearNormalizer()
+ 
+@@ -175,6 +245,11 @@ class VAE:
+         else:
+             self.quant = torch.nn.Conv1d(self.n_latent_dims, 2*self.n_embed, 1).to(self.device)
+             self.post_quant = torch.nn.Conv1d(self.n_embed, self.n_latent_dims, 1).to(self.device)
++        self.res_pred = None
++        if self.n_res_dims > 0 and self.res_pred_weight > 0:
++            det_dim = (self.n_embed - self.n_res_dims) * self.downsampled_input_h
++            self.res_pred = MLP(input_dim=int(sum(res_pred_obs_dims)), output_dim=det_dim,
++                                hidden_dim=128, layer_num=1).to(self.device)
+         self.embedding_dim = self.n_latent_dims
+ 
+         self.optim_params = (
+@@ -186,6 +261,8 @@ class VAE:
+         else:
+             self.optim_params += list(self.quant.parameters())
+             self.optim_params += list(self.post_quant.parameters())
++        if self.res_pred is not None:
++            self.optim_params += list(self.res_pred.parameters())
+ 
+         if load_dir is not None:
+             try:
+@@ -246,6 +323,13 @@ class VAE:
+             state = einops.rearrange(state, "N T A -> N A T")
+ 
+         moments = self.quant(state)
++        if self.n_res_dims > 0:
++            # z_res: one value per chunk -- average its mean and logvar over time
++            k, E = self.n_res_dims, self.n_embed
++            res_idx = torch.cat([torch.arange(k), torch.arange(E, E + k)]).to(moments.device)
++            res = moments[:, res_idx].mean(dim=-1, keepdim=True).expand(-1, -1, moments.shape[-1])
++            moments = moments.clone()
++            moments[:, res_idx] = res
+         posterior = DiagonalGaussianDistribution(moments)
+         state_vq = posterior.sample()
+         state_vq = einops.rearrange(state_vq, "N A T -> N (T A)")
+@@ -253,7 +337,7 @@ class VAE:
+         return state_vq, posterior
+ 
+     def postprocess_quant_state_without_vq(self, state_vq):
+-        state_vq = einops.rearrange(state_vq, "N (T A) -> N A T", T=self.downsampled_input_h)
++        state_vq = einops.rearrange(state_vq, "N (T A) -> N A T", T=self.downsampled_input_h) # [N, A*T] -> [N,A,T]
+         state_vq = self.post_quant(state_vq)
+         state_vq = einops.rearrange(state_vq, "N A T -> N (T A)")
+ 
+@@ -286,6 +370,16 @@ class VAE:
+             state_vq, vq_code, vq_loss_state = self.quant_state_with_vq(state_rep)
+         else:
+             state_vq, posterior = self.quant_state_without_vq(state_rep)
++            # At train time z encodes the TRUE chunk, so the decoder can rebuild
++            # it without ever reading temporal_cond -- which is why shuffling the
++            # tactile moves held-out reconstruction by +0.0%. At deploy time z is
++            # the LDP's prediction and is wrong; touch is what could fix it, but
++            # the decoder never met that situation. Corrupting z here is what
++            # creates the need. Weighting the contact phase does not: it changes
++            # which samples matter, not whether z already suffices.
++            if self.latent_noise > 0:
++                sd = state_vq.detach().std(dim=0, keepdim=True)
++                state_vq = state_vq + self.latent_noise * sd * torch.randn_like(state_vq)
+             state_vq = self.postprocess_quant_state_without_vq(state_vq)
+ 
+         if self.use_rnn_decoder:
+@@ -295,7 +389,21 @@ class VAE:
+         else:
+             dec_out = self.decoder(state_vq)
+ 
+-        encoder_loss = (state - dec_out).abs().mean()
++        # Uniform reconstruction dilutes the contact phase: the chunk's own xy
++        # travel is ~2.3 mm there against ~14 mm on approach, and a Granger test
++        # on the demos put tactile's net contribution to future action at
++        # R^2 +0.02 in that phase and ~0 on approach. A loss that spends the same
++        # weight everywhere has no reason to read touch.
++        per_sample = (state - dec_out).abs().mean(dim=tuple(range(1, state.dim())))
++        if self.contact_weight > 0:
++            raw = batch["action"]                                   # (N, T, A) raw units
++            mv = raw[..., :2].sum(dim=1).norm(dim=-1)               # chunk xy travel
++            thr = torch.quantile(mv.float(), self.contact_quantile)
++            w = 1.0 + self.contact_weight * (mv < thr).to(per_sample.dtype)
++            w = w / w.mean()
++            encoder_loss = (per_sample * w).mean()
++        else:
++            encoder_loss = per_sample.mean()
+         vae_recon_loss = torch.nn.MSELoss()(state, dec_out)
+ 
+         return_dict = {
+@@ -315,6 +423,14 @@ class VAE:
+         else:
+             kl_loss = posterior.kl().mean()
+             rep_loss = encoder_loss * self.encoder_loss_multiplier + (kl_loss * self.kl_multiplier)
++            if self.n_res_dims > 0:
++                res_terms = self.residual_losses(posterior, batch)
++                rep_loss = rep_loss + res_terms.pop('_total')
++                return_dict.update(res_terms)
++            if self.struct_enabled:
++                st_terms = self.struct_losses(posterior, state_vq, temporal_cond, batch)
++                rep_loss = rep_loss + st_terms.pop('_total')
++                return_dict.update(st_terms)
+             return_dict["loss"] = rep_loss
+             return_dict.update({
+                 "kl_loss": kl_loss.clone().detach().cpu().numpy(),
+@@ -323,6 +439,81 @@ class VAE:
+ 
+         return return_dict
+ 
++    def residual_losses(self, posterior, batch):
++        """Extra terms for the structured residual latent. posterior.mean: (N, E, T)."""
++        k = self.n_res_dims
++        mu_res = posterior.mean[:, :k, 0]                       # time-invariant by construction
++        logvar_res = posterior.logvar[:, :k, 0]
++        res_kl = (0.5 * (mu_res.pow(2) + logvar_res.exp() - 1.0 - logvar_res)).sum(-1).mean()
++        total = self.res_kl_multiplier * res_kl
++        out = {'res_kl': float(res_kl.detach().cpu())}
++        if self.res_sup_key is not None and self.res_sup_weight > 0:
++            raw = batch['obs'][self.res_sup_key][:, -1, 0].to(mu_res.device).float()
++            if self.res_sup_rel_key is not None:
++                raw = raw - batch['obs'][self.res_sup_rel_key][:, -1, 0].to(mu_res.device).float()
++            target = (raw - self.res_sup_center) / self.res_sup_scale
++            sup = torch.nn.functional.mse_loss(mu_res[:, 0], target)
++            total = total + self.res_sup_weight * sup
++            out['res_sup_mse'] = float(sup.detach().cpu())
++        if self.res_pred is not None:
++            obs_now = torch.cat([self.normalizer[key].normalize(batch['obs'][key][:, -1]).to(mu_res.device).float()
++                                 for key in self.res_pred_obs_keys], dim=-1)
++            z_det = posterior.mean[:, k:, :].reshape(mu_res.shape[0], -1)
++            pred = self.res_pred(obs_now)
++            # normalised so shrinking z_det's scale cannot make the penalty vanish
++            pred_err = (pred - z_det).pow(2).mean() / (z_det.detach().var(dim=0).mean() + 1e-6)
++            total = total + self.res_pred_weight * pred_err
++            out['res_pred_nmse'] = float(pred_err.detach().cpu())
++        out['_total'] = total
++        return out
++
++    def struct_axis(self):
++        """Unit direction u of the structured scalar in the decoder latent ('N (T A)' after post_quant)."""
++        from reactive_diffusion_policy.model.vae.structured_latent import struct_direction
++        return struct_direction(self.n_latent_dims, self.downsampled_input_h, self.struct_channel, self.device)
++
++    def struct_scalar(self, z_post):
++        """s(z) for decoder latents z_post (N, D)."""
++        return z_post @ self.struct_axis().to(z_post.device, z_post.dtype)
++
++    def struct_losses(self, posterior, state_vq, temporal_cond, batch):
++        """AT-S terms (structured_latent.py). state_vq: post-quant latent used for reconstruction (N, D)."""
++        from reactive_diffusion_policy.model.vae.structured_latent import exec_window_sum, ctrl_terms
++        s0, h = self.struct_exec_start, self.struct_exec_steps
++        u = self.struct_axis().to(state_vq.device, state_vq.dtype)
++        total = torch.zeros((), device=state_vq.device)
++        out = {}
++        z_mean = self.postprocess_quant_state_without_vq(einops.rearrange(posterior.mean, 'N A T -> N (T A)'))
++        s = z_mean @ u
++        raw = batch['action'].to(state_vq.device).float()
++        target = (exec_window_sum(raw, s0, h)[:, 0] - self.struct_x_mean) / self.struct_x_std
++        reg = torch.nn.functional.mse_loss(s, target)
++        out['struct_reg_mse'] = float(reg.detach().cpu())
++        if self.struct_reg_weight > 0:
++            total = total + self.struct_reg_weight * reg
++        if self.struct_ctrl_weight > 0:
++            z = state_vq.detach()
++            delta = (2 * torch.rand(z.shape[0], device=z.device) - 1) * self.struct_delta_max
++            both = self.decoder(torch.cat([z, z + delta[:, None] * u[None]], 0), torch.cat([temporal_cond, temporal_cond], 0))
++            both = einops.rearrange(both * self.act_scale, 'N (T A) -> N T A', A=self.input_dim_w)
++            base_n, pert_n = both.chunk(2, 0)
++            d_norm = pert_n - base_n
++            # the normalizer lives on the CPU (as for normalize() above); bring the result back
++            d_raw = (self.normalizer['action'].unnormalize(pert_n) - self.normalizer['action'].unnormalize(base_n)).to(z.device)
++            lin, leak = ctrl_terms(d_raw, d_norm, delta, s0, h, self.struct_x_std, self.struct_k)
++            total = total + self.struct_ctrl_weight * (lin + self.struct_leak_weight * leak)
++            out['struct_ctrl_lin'] = float(lin.detach().cpu())
++            out['struct_ctrl_leak'] = float(leak.detach().cpu())
++        out['_total'] = total
++        return out
++
++    def residual_axis(self):
++        """Direction in the decoder latent ('N (T A)' after post_quant) that moving z_res[0] by one
++        unit produces, for policy_server/bridge --axis-file enumeration."""
++        assert self.n_res_dims > 0
++        w = self.post_quant.weight[:, 0, 0].detach()             # (n_latent_dims,)
++        return w.repeat(self.downsampled_input_h)                # 'N (T A)' layout
++
+     def eval(self):
+         self.encoder.eval()
+         self.decoder.eval()
+@@ -331,6 +522,8 @@ class VAE:
+         else:
+             self.quant.eval()
+             self.post_quant.eval()
++        if self.res_pred is not None:
++            self.res_pred.eval()
+ 
+     def train(self):
+         self.encoder.train()
+@@ -340,6 +533,8 @@ class VAE:
+         else:
+             self.quant.train()
+             self.post_quant.train()
++        if self.res_pred is not None:
++            self.res_pred.train()
+ 
+     def to(self, device):
+         self.encoder.to(device)
+@@ -349,6 +544,8 @@ class VAE:
+         else:
+             self.quant.to(device)
+             self.post_quant.to(device)
++        if self.res_pred is not None:
++            self.res_pred.to(device)
+         self.device = device
+ 
+     def state_dict(self):
+@@ -361,6 +558,8 @@ class VAE:
+         else:
+             state_dict["quant"] = self.quant.state_dict()
+             state_dict["post_quant"] = self.post_quant.state_dict()
++        if self.res_pred is not None:
++            state_dict["res_pred"] = self.res_pred.state_dict()
+         return state_dict
+ 
+     def load_state_dict(self, state_dict):
+@@ -375,3 +574,5 @@ class VAE:
+         else:
+             self.quant.load_state_dict(state_dict["quant"])
+             self.post_quant.load_state_dict(state_dict["post_quant"])
++        if self.res_pred is not None and "res_pred" in state_dict:
++            self.res_pred.load_state_dict(state_dict["res_pred"])
+diff --git a/reactive_diffusion_policy/model/vision/multi_image_obs_encoder.py b/reactive_diffusion_policy/model/vision/multi_image_obs_encoder.py
+index 2448a3e..0aa0806 100644
+--- a/reactive_diffusion_policy/model/vision/multi_image_obs_encoder.py
++++ b/reactive_diffusion_policy/model/vision/multi_image_obs_encoder.py
+@@ -100,20 +100,27 @@ class MultiImageObsEncoder(ModuleAttrMixin):
+                 #         this_normalizer = torchvision.transforms.CenterCrop(
+                 #             size=(h,w)
+                 #         )
+-                assert len(random_transforms) == 1, "Only support single RandomCrop now"
+-                if random_transforms is not None and not isinstance(random_transforms[0], torch.nn.Module):
+-                    assert random_transforms[0].type == 'RandomCrop'
+-                    ratio = random_transforms[0].ratio
+-                    random_transforms = [
+-                                     CropRandomizer(
+-                                            input_shape=input_shape,
+-                                            crop_height=int(input_shape[1]*ratio),
+-                                            crop_width=int(input_shape[2]*ratio),
+-                                            num_crops=1,
+-                                            pos_enc=False
+-                                     )
+-                                 ] + random_transforms[1:]
+-                this_randomizer = nn.Identity() if random_transforms is None else torch.nn.Sequential(*random_transforms)
++                # build this key's own randomizer from a copy of the config,
++                # not the shared `random_transforms` variable -- mutating
++                # that in place (as below) would leak the previous key's
++                # CropRandomizer (built for its own, possibly different,
++                # input_shape) into every subsequent rgb key's transform.
++                key_random_transforms = copy.deepcopy(random_transforms)
++                if key_random_transforms is not None:
++                    assert len(key_random_transforms) == 1, "Only support single RandomCrop now"
++                    if not isinstance(key_random_transforms[0], torch.nn.Module):
++                        assert key_random_transforms[0].type == 'RandomCrop'
++                        ratio = key_random_transforms[0].ratio
++                        key_random_transforms = [
++                                         CropRandomizer(
++                                                input_shape=input_shape,
++                                                crop_height=int(input_shape[1]*ratio),
++                                                crop_width=int(input_shape[2]*ratio),
++                                                num_crops=1,
++                                                pos_enc=False
++                                         )
++                                     ] + key_random_transforms[1:]
++                this_randomizer = nn.Identity() if key_random_transforms is None else torch.nn.Sequential(*key_random_transforms)
+                 # configure normalizer
+                 this_normalizer = nn.Identity()
+                 if imagenet_norm:
+diff --git a/reactive_diffusion_policy/policy/diffusion_unet_image_policy.py b/reactive_diffusion_policy/policy/diffusion_unet_image_policy.py
+index 40a26d4..003f941 100644
+--- a/reactive_diffusion_policy/policy/diffusion_unet_image_policy.py
++++ b/reactive_diffusion_policy/policy/diffusion_unet_image_policy.py
+@@ -84,17 +84,28 @@ class DiffusionUnetImagePolicy(BaseImagePolicy):
+             condition_data, condition_mask,
+             local_cond=None, global_cond=None,
+             generator=None,
++            # opt-in (latent_clamp study, 2026-10-06); all None = original behaviour.
++            #   init_noise: use this initial x_T instead of drawing one
++            #   noise_out:  list; the initial x_T actually used is appended (no extra RNG use)
++            #   clamp:      callable(x_prev, step_output, t) -> x_prev applied after every scheduler step,
++            #               and once more as clamp(x, None, None) at the end (exact final projection)
++            init_noise=None, noise_out=None, clamp=None,
+             # keyword arguments to scheduler.step
+             **kwargs
+             ):
+         model = self.model
+         scheduler = self.noise_scheduler
+ 
+-        trajectory = torch.randn(
+-            size=condition_data.shape, 
+-            dtype=condition_data.dtype,
+-            device=condition_data.device,
+-            generator=generator)
++        if init_noise is not None:
++            trajectory = init_noise.to(device=condition_data.device, dtype=condition_data.dtype).clone()
++        else:
++            trajectory = torch.randn(
++                size=condition_data.shape, 
++                dtype=condition_data.dtype,
++                device=condition_data.device,
++                generator=generator)
++        if noise_out is not None:
++            noise_out.append(trajectory.clone())
+     
+         # set step values
+         scheduler.set_timesteps(self.num_inference_steps)
+@@ -108,14 +119,19 @@ class DiffusionUnetImagePolicy(BaseImagePolicy):
+                 local_cond=local_cond, global_cond=global_cond)
+ 
+             # 3. compute previous image: x_t -> x_t-1
+-            trajectory = scheduler.step(
++            step_out = scheduler.step(
+                 model_output, t, trajectory, 
+                 generator=generator,
+                 **kwargs
+-                ).prev_sample
++                )
++            trajectory = step_out.prev_sample
++            if clamp is not None:
++                trajectory = clamp(trajectory, step_out, t)
+         
+         # finally make sure conditioning is enforced
+         trajectory[condition_mask] = condition_data[condition_mask]        
++        if clamp is not None:
++            trajectory = clamp(trajectory, None, None)
+ 
+         return trajectory
+ 
+diff --git a/reactive_diffusion_policy/policy/latent_diffusion_unet_image_policy.py b/reactive_diffusion_policy/policy/latent_diffusion_unet_image_policy.py
+index ade598a..9ad78f1 100644
+--- a/reactive_diffusion_policy/policy/latent_diffusion_unet_image_policy.py
++++ b/reactive_diffusion_policy/policy/latent_diffusion_unet_image_policy.py
+@@ -7,6 +7,7 @@ from einops import reduce
+ from diffusers.schedulers.scheduling_ddpm import DDPMScheduler
+ 
+ from reactive_diffusion_policy.policy.diffusion_unet_image_policy import DiffusionUnetImagePolicy
++from reactive_diffusion_policy.model.diffusion.conditional_unet1d import ConditionalUnet1D
+ from reactive_diffusion_policy.model.vision.multi_image_obs_encoder import MultiImageObsEncoder
+ from reactive_diffusion_policy.model.vision.timm_obs_encoder import TimmObsEncoder
+ from reactive_diffusion_policy.model.vae.model import VAE
+@@ -30,6 +31,21 @@ class LatentDiffusionUnetImagePolicy(DiffusionUnetImagePolicy):
+                  kernel_size=5,  # dummy
+                  n_groups=8,
+                  cond_predict_scale=True,
++                 # 'full' (default) conditions on the n_obs_steps history; 'last' repeats the newest
++                 # frame into every history slot. Scripted experts steer with the privileged socket
++                 # pose, so the EE history in their demos encodes the target; a policy that cannot see
++                 # the socket learns to read it off that history and, in closed loop, off its own
++                 # motion (xobs: arrival x tracks start x, corr 0.56). 'last' removes the velocity
++                 # channel of that leak without moving "now" in the action chunk (To is unchanged).
++                 obs_history='full',
++                 # Axis-conditioned latent prior (xobs 2026-10-05). axis_cond_file: npz with W (k, D) unit axes in the decoder
++                 # (post-quant) latent space and mu / sd of the demo latents' projections. The LDP gets c = (z_post @ W.T - mu) / sd
++                 # of the target chunk as extra global conditioning [c * m, m], with m ~ Bernoulli(1 - axis_cond_drop) during
++                 # training (classifier-free style); predict_action(axis_cond=None) is the unconditional policy. Enumerating c at
++                 # inference generates candidates spread along data-found axes INSIDE the learned distribution, instead of adding
++                 # out-of-distribution offsets to a sampled latent.
++                 axis_cond_file=None,
++                 axis_cond_drop=0.2,
+                  # parameters passed to step
+                  **kwargs):
+ 
+@@ -47,6 +63,7 @@ class LatentDiffusionUnetImagePolicy(DiffusionUnetImagePolicy):
+             horizon = at.downsampled_input_h
+             kernel_size = 1
+ 
++        assert obs_history in ('full', 'last'), obs_history
+         super().__init__(shape_meta,
+                          noise_scheduler,
+                          obs_encoder,
+@@ -63,6 +80,21 @@ class LatentDiffusionUnetImagePolicy(DiffusionUnetImagePolicy):
+                          **kwargs)
+ 
+         self.original_horizon = original_horizon
++        self._obs_history = obs_history
++        self.axis_cond_k = 0
++        if axis_cond_file:
++            import numpy as np
++            ac = np.load(axis_cond_file)
++            self.register_buffer('axis_W', torch.from_numpy(ac['W']).float())
++            self.register_buffer('axis_mu', torch.from_numpy(ac['mu']).float())
++            self.register_buffer('axis_sd', torch.from_numpy(ac['sd']).float())
++            self.axis_cond_k = int(ac['W'].shape[0])
++            self.axis_cond_drop = float(axis_cond_drop)
++            self.model = ConditionalUnet1D(
++                input_dim=self.action_dim, local_cond_dim=None,
++                global_cond_dim=self.obs_feature_dim * n_obs_steps + 2 * self.axis_cond_k,
++                diffusion_step_embed_dim=diffusion_step_embed_dim, down_dims=down_dims, kernel_size=kernel_size,
++                n_groups=n_groups, cond_predict_scale=cond_predict_scale)
+ 
+         if horizon == 1:
+             # hack: remove the upsample/downsample layers
+@@ -89,15 +121,21 @@ class LatentDiffusionUnetImagePolicy(DiffusionUnetImagePolicy):
+                        obs_dict: Dict[str, torch.Tensor],
+                        dataset_obs_temporal_downsample_ratio: int,
+                        extended_obs_dict: Dict[str, torch.Tensor] = None,
+-                       return_latent_action=False
++                       return_latent_action=False,
++                       axis_cond: torch.Tensor = None,
++                       noise_out: list = None,
++                       init_noise: torch.Tensor = None
+                        ) -> Dict[str, torch.Tensor]:
+         """
+         obs_dict: must include "obs" key
+         result: must include "action" key
++        return_latent_action = True 이면, 
++        action_pred = [B, original_horizon, latent_dim], original_horizon(action chunk 길이: 10)
++        action = [B, n_action_steps, latent_dim]
+         """
+         assert 'past_action' not in obs_dict  # not implemented yet
+         # normalize input
+-        nobs = self.normalizer.normalize(obs_dict)
++        nobs = self.normalizer.normalize(obs_dict)  # 정규화된 obs
+         value = next(iter(nobs.values()))
+         B, To = value.shape[:2]
+         T = self.horizon
+@@ -114,10 +152,18 @@ class LatentDiffusionUnetImagePolicy(DiffusionUnetImagePolicy):
+         global_cond = None
+         if self.obs_as_global_cond:
+             # condition through global feature
+-            this_nobs = dict_apply(nobs, lambda x: x[:, :To, ...].reshape(-1, *x.shape[2:]))
++            this_nobs = dict_apply(nobs, lambda x: self._obs_window(x, To).reshape(-1, *x.shape[2:]))
+             nobs_features = self.obs_encoder(this_nobs)
+             # reshape back to B, Do
+             global_cond = nobs_features.reshape(B, -1)
++            if self.axis_cond_k > 0:
++                if axis_cond is None:
++                    c_in = torch.zeros(B, self.axis_cond_k, device=global_cond.device, dtype=global_cond.dtype)
++                    m_in = torch.zeros(B, 1, device=global_cond.device, dtype=global_cond.dtype)
++                else:
++                    c_in = axis_cond.to(global_cond.device, global_cond.dtype)
++                    m_in = torch.ones(B, 1, device=global_cond.device, dtype=global_cond.dtype)
++                global_cond = self._axis_global(global_cond, c_in, m_in)
+             # empty data for action
+             cond_data = torch.zeros(size=(B, T, Da), device=device, dtype=dtype)
+             cond_mask = torch.zeros_like(cond_data, dtype=torch.bool)
+@@ -125,11 +171,15 @@ class LatentDiffusionUnetImagePolicy(DiffusionUnetImagePolicy):
+             raise NotImplementedError
+ 
+         # run sampling
++        # latent action 샘플링 
+         nlatent_sample = self.conditional_sample(
+             cond_data,
+             cond_mask,
+             local_cond=local_cond,
+             global_cond=global_cond,
++            **({'noise_out': noise_out} if noise_out is not None else {}),
++            # opt-in (budget-compare study, 2026-10-06): caller-supplied initial x_T (per-draw seeded noise)
++            **({'init_noise': init_noise} if init_noise is not None else {}),
+             **self.kwargs)
+         # unnormalize prediction
+         nlatent_sample = self.normalizer['latent_action'].unnormalize(nlatent_sample)
+@@ -137,6 +187,8 @@ class LatentDiffusionUnetImagePolicy(DiffusionUnetImagePolicy):
+         # decode latent action
+         # note: handle latent action correctly
+         nlatent_sample = einops.rearrange(nlatent_sample, 'N T A -> N (T A)')
++        
++        # latent action VQ(양자화) 사용 여부, VQ: latent space를 고정된 크기의 codebook을 사용해 압축하여 정보 압축
+         if self.at.use_vq:
+             if self.use_latent_action_before_vq:
+                 state_vq, _, _ = self.at.quant_state_with_vq(nlatent_sample)
+@@ -161,12 +213,12 @@ class LatentDiffusionUnetImagePolicy(DiffusionUnetImagePolicy):
+             action_pred = self.normalizer['action'].unnormalize(naction_pred)
+ 
+         # hack: align with the training process
+-        To = self.n_obs_steps * dataset_obs_temporal_downsample_ratio
++        To = self.n_obs_steps * dataset_obs_temporal_downsample_ratio # (2*1)
+         # get action
+-        start = To - 1
++        start = To - 1 # (2-1)
+         # hack
+-        n_action_steps = self.original_horizon - self.n_obs_steps * dataset_obs_temporal_downsample_ratio + 1
+-        end = start + n_action_steps
++        n_action_steps = self.original_horizon - self.n_obs_steps * dataset_obs_temporal_downsample_ratio + 1  # (10 - 2*1 +1)
++        end = start + n_action_steps # 10
+         action = action_pred[:, start:end]
+ 
+         result = {
+@@ -175,6 +227,103 @@ class LatentDiffusionUnetImagePolicy(DiffusionUnetImagePolicy):
+         }
+         return result
+ 
++    # use_mcy
++    # ========= latent_clamp (axis-clamped sampling, 2026-10-06) =========
++    # The decoder latent z (what predict_action(return_latent_action=True) returns, 'N (T A)' after post_quant)
++    # is an affine function of the normalized diffusion sample x: z = M x + b (per-dim affine latent normalizer,
++    # then the 1x1 Conv1d post_quant). A constraint <z, w> = t on z is therefore the linear constraint
++    # <x, u> = c on x with u = M^T w / |M^T w| and c = (t - <w, b>) / |M^T w|.
++    def latent_from_normalized(self, x):
++        """x: (B, T, Da) normalized diffusion sample -> decoder latent (B, T*A), same path as predict_action."""
++        z = self.normalizer['latent_action'].unnormalize(x)
++        z = einops.rearrange(z, 'N T A -> N (T A)')
++        if self.at.use_vq:
++            raise NotImplementedError('latent_clamp: VQ latents are not an affine image of the diffusion sample')
++        return self.at.postprocess_quant_state_without_vq(z)
++
++    @torch.no_grad()
++    def latent_affine(self):
++        """(M, b) with latent_from_normalized(x) = M @ x.flatten() + b; M: (D_z, T*Da), b: (D_z,)."""
++        T, Da = self.horizon, self.action_dim
++        n = T * Da
++        X = torch.cat([torch.zeros(1, n), torch.eye(n)], 0).to(self.device, self.dtype).view(n + 1, T, Da)
++        Z = self.latent_from_normalized(X)
++        b = Z[0]
++        return (Z[1:] - b[None]).T.contiguous(), b
++
++    @torch.no_grad()
++    def encode_global_cond(self, obs_dict):
++        """global_cond exactly as predict_action builds it (axis_cond=None)."""
++        nobs = self.normalizer.normalize(obs_dict)
++        B = next(iter(nobs.values())).shape[0]
++        To = self.n_obs_steps
++        this_nobs = dict_apply(nobs, lambda x: self._obs_window(x, To).reshape(-1, *x.shape[2:]))
++        global_cond = self.obs_encoder(this_nobs).reshape(B, -1)
++        if self.axis_cond_k > 0:
++            c_in = torch.zeros(B, self.axis_cond_k, device=global_cond.device, dtype=global_cond.dtype)
++            m_in = torch.zeros(B, 1, device=global_cond.device, dtype=global_cond.dtype)
++            global_cond = self._axis_global(global_cond, c_in, m_in)
++        return global_cond
++
++    @torch.no_grad()
++    def sample_latent_from_global_cond(self, global_cond, init_noise):
++        """opt-in (cond-cache stage 0, 2026-10-08): the latent that predict_action(return_latent_action=True,
++        init_noise=init_noise)['action'][:, 0] returns, but from a caller-supplied global_cond (B, Dg) instead of
++        re-encoding the observation. Same sampler call and same post-processing as predict_action; no decoder use."""
++        B = global_cond.shape[0]
++        cond_data = torch.zeros(size=(B, self.horizon, self.action_dim), device=self.device, dtype=self.dtype)
++        cond_mask = torch.zeros_like(cond_data, dtype=torch.bool)
++        x = self.conditional_sample(cond_data, cond_mask, local_cond=None, global_cond=global_cond,
++                                    init_noise=init_noise, **self.kwargs)
++        z = self.normalizer['latent_action'].unnormalize(x)
++        z = einops.rearrange(z, 'N T A -> N (T A)')
++        if self.at.use_vq:
++            if self.use_latent_action_before_vq:
++                z, _, _ = self.at.quant_state_with_vq(z)
++            return z
++        return self.at.postprocess_quant_state_without_vq(z)
++
++    def _alpha_prev(self, t):
++        sch = self.noise_scheduler
++        prev_t = int(t) - sch.config.num_train_timesteps // sch.num_inference_steps
++        return sch.alphas_cumprod[prev_t] if prev_t >= 0 else sch.final_alpha_cumprod
++
++    def make_x0_projection_clamp(self, u, c):
++        """DDIM x0-projection onto the hyperplane <x, u> = c (u unit, c per row).
++
++        After each DDIM step x_{t-1} = sqrt(a_{t-1}) x0_hat + sqrt(1 - a_{t-1}) eps_hat, replace x0_hat by its
++        projection x0_hat + (c - <x0_hat, u>) u while keeping the model's eps_hat:
++            x_{t-1} <- x_{t-1} + sqrt(a_{t-1}) (c - <x0_hat, u>) u.
++        The component along u then equals the forward-noised target sqrt(a)c + sqrt(1-a)<eps_hat, u>
++        (inpainting along u with the model's own noise estimate); every orthogonal component is left to the model.
++        Final call (step_out None): exact projection of the sample."""
++        from diffusers.schedulers.scheduling_ddim import DDIMScheduler
++        if not isinstance(self.noise_scheduler, DDIMScheduler) or float(self.kwargs.get('eta', 0.0)) != 0.0:
++            raise NotImplementedError('latent_clamp is implemented for the deterministic DDIM sampler (eta = 0)')
++
++        def clamp(x, step_out, t):
++            B = x.shape[0]
++            uu = u.to(x.device, x.dtype)
++            cc = c.to(x.device, x.dtype)
++            if step_out is None:
++                r = cc - x.reshape(B, -1) @ uu
++                return x + (r[:, None] * uu[None]).view_as(x)
++            x0 = step_out.pred_original_sample
++            r = cc - x0.reshape(B, -1) @ uu
++            a = torch.as_tensor(self._alpha_prev(t), device=x.device, dtype=x.dtype)
++            return x + (a.sqrt() * r[:, None] * uu[None]).view_as(x)
++        return clamp
++
++    @torch.no_grad()
++    def sample_latent_clamped(self, global_cond, init_noise, u, c):
++        """global_cond (B, Dg), init_noise (B, T, Da), u (T*Da,) unit, c (B,) -> decoder latents (B, T*A)."""
++        B = global_cond.shape[0]
++        cond_data = torch.zeros(size=(B, self.horizon, self.action_dim), device=self.device, dtype=self.dtype)
++        cond_mask = torch.zeros_like(cond_data, dtype=torch.bool)
++        x = self.conditional_sample(cond_data, cond_mask, local_cond=None, global_cond=global_cond,
++                                    init_noise=init_noise, clamp=self.make_x0_projection_clamp(u, c), **self.kwargs)
++        return self.latent_from_normalized(x)
++
+     def predict_from_latent_action(self, latent_action: torch.Tensor, extended_obs_dict: Dict[str, torch.Tensor], extended_obs_last_step: int, dataset_obs_temporal_downsample_ratio: int, extend_obs_pad_after: bool = False):
+         Da = self.action_dim
+         To = self.n_obs_steps
+@@ -197,10 +346,10 @@ class LatentDiffusionUnetImagePolicy(DiffusionUnetImagePolicy):
+         action_pred = self.normalizer['action'].unnormalize(naction_pred)
+ 
+         # hack: align with the training process
+-        To = self.n_obs_steps * dataset_obs_temporal_downsample_ratio
+-        start = To - 1
+-        n_action_steps = self.original_horizon - self.n_obs_steps * dataset_obs_temporal_downsample_ratio + 1
+-        end = start + n_action_steps
++        To = self.n_obs_steps * dataset_obs_temporal_downsample_ratio # (2*1)
++        start = To - 1  # (2-1)
++        n_action_steps = self.original_horizon - self.n_obs_steps * dataset_obs_temporal_downsample_ratio + 1   # (10 - 2*1 +1)
++        end = start + n_action_steps    #(1+9)
+         action = action_pred[:, start:end]
+ 
+         result = {
+@@ -212,6 +361,18 @@ class LatentDiffusionUnetImagePolicy(DiffusionUnetImagePolicy):
+ 
+ 
+     # ========= training  ============
++    def axis_coord(self, post_latent):
++        """decoder (post-quant) latent (B, D) -> standardised axis coordinates c (B, k)"""
++        return (post_latent @ self.axis_W.T - self.axis_mu) / self.axis_sd
++
++    def _axis_global(self, global_cond, c, mask):
++        return torch.cat([global_cond, c * mask, mask.expand(-1, c.shape[1])], dim=-1)
++
++    def _obs_window(self, x, To):
++        if self._obs_history == 'last':
++            return x[:, To - 1:To, ...].expand(-1, To, *x.shape[2:])
++        return x[:, :To, ...]
++
+     def compute_loss(self, batch):
+         # normalize input
+         assert 'valid_mask' not in batch
+@@ -232,6 +393,9 @@ class LatentDiffusionUnetImagePolicy(DiffusionUnetImagePolicy):
+                     nlatent_actions = einops.rearrange(nlatent_actions, 'N T A -> N (T A)')
+         else:
+             nlatent_actions, _ = self.at.quant_state_without_vq(nlatent_actions)
++            if self.axis_cond_k > 0:
++                with torch.no_grad():
++                    c_train = self.axis_coord(self.at.postprocess_quant_state_without_vq(nlatent_actions))
+         nlatent_actions = einops.rearrange(nlatent_actions, 'N (T A) -> N T A', T=self.horizon)
+         nlatent_actions = self.normalizer['latent_action'].normalize(nlatent_actions)
+ 
+@@ -243,10 +407,13 @@ class LatentDiffusionUnetImagePolicy(DiffusionUnetImagePolicy):
+         if self.obs_as_global_cond:
+             # reshape B, T, ... to B*T
+             this_nobs = dict_apply(nobs,
+-                                   lambda x: x[:, :self.n_obs_steps, ...].reshape(-1, *x.shape[2:]))
++                                   lambda x: self._obs_window(x, self.n_obs_steps).reshape(-1, *x.shape[2:]))
+             nobs_features = self.obs_encoder(this_nobs)
+             # reshape back to B, Do
+             global_cond = nobs_features.reshape(batch_size, -1)
++            if self.axis_cond_k > 0:
++                keep = (torch.rand(batch_size, 1, device=global_cond.device) > self.axis_cond_drop).to(global_cond.dtype)
++                global_cond = self._axis_global(global_cond, c_train.to(global_cond.dtype), keep)
+         else:
+             raise NotImplementedError
+ 
+diff --git a/reactive_diffusion_policy/real_world/ros_data_converter.py b/reactive_diffusion_policy/real_world/ros_data_converter.py
+index 8e59fe4..67be975 100644
+--- a/reactive_diffusion_policy/real_world/ros_data_converter.py
++++ b/reactive_diffusion_policy/real_world/ros_data_converter.py
+@@ -50,6 +50,7 @@ class ROS2DataConverter:
+ 
+         o3d.visualization.draw_geometries([world, left_tcp, left_base, right_tcp, right_base])
+ 
++    # ROS에서 publish한 PoseStamped, TwistStamped, WrenchStamped, JointState를 numpy array로 전환 
+     def convert_robot_states(self, topic_dict: Dict) -> (
+             Tuple)[np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+         left_tcp_pose: PoseStamped = topic_dict['/left_tcp_pose']
+@@ -94,6 +95,7 @@ class ROS2DataConverter:
+         
+         return color_image
+ 
++    # JPEG RGB이미지를 numpy array로 변환
+     def decode_rgb_image(self, msg: Image) -> np.ndarray:
+         np_arr = np.frombuffer(msg.data, np.uint8)
+         color_image = cv2.imdecode(np_arr, cv2.IMREAD_COLOR)
+@@ -101,6 +103,7 @@ class ROS2DataConverter:
+ 
+         return rgb_image
+ 
++    # Point array에서 마커 위치 및 offset 추출
+     def decode_tactile_messages(self, msg: PointCloud2):
+         # TODO: use 3D representation as default
+         if self.tactile_camera_marker_dimension == 2:
+@@ -138,6 +141,7 @@ class ROS2DataConverter:
+ 
+         return point_cloud_list, rgb_image_list
+ 
++    # Tactile camera의 RGB 및 tactile marker 추출
+     def convert_tactile_camera(self, topic_dict: Dict) -> \
+             Tuple[List[Optional[np.ndarray]], List[Optional[np.ndarray]],List[Optional[np.ndarray]]]:
+         rgb_image_list = []
+@@ -174,6 +178,7 @@ class ROS2DataConverter:
+ 
+         return rgb_image_list, marker_loc_list, marker_offset_list
+ 
++    # 모든 데이터를 하나의 SensorMesssage 객체로 통합 
+     def convert_all_data(self, topic_dict: Dict) -> SensorMessage:
+         # calculate the lastest timestamp in the topic_dict
+         latest_timestamp = max([msg.header.stamp.sec + msg.header.stamp.nanosec * 1e-9
+diff --git a/reactive_diffusion_policy/workspace/train_at_workspace.py b/reactive_diffusion_policy/workspace/train_at_workspace.py
+index 348b306..91ac1b7 100644
+--- a/reactive_diffusion_policy/workspace/train_at_workspace.py
++++ b/reactive_diffusion_policy/workspace/train_at_workspace.py
+@@ -130,9 +130,9 @@ class TrainATWorkspace(BaseWorkspace):
+                 train_losses = list()
+                 with tqdm.tqdm(train_dataloader, desc=f"Training epoch {self.epoch}",
+                                leave=False, mininterval=cfg.training.tqdm_interval_sec) as tepoch:
+-                    for batch_idx, batch in enumerate(tepoch):
++                    for batch_idx, batch in enumerate(tepoch):  # BaseImageDataset 기반 custom image dataset 
+                         # device transfer
+-                        batch = dict_apply(batch, lambda x: x.to(device, non_blocking=True))
++                        batch = dict_apply(batch, lambda x: x.to(device, non_blocking=True)) # tensor를 gpu로 옮김
+                         if train_sampling_batch is None:
+                             train_sampling_batch = batch
+                         # compute loss
+@@ -163,6 +163,8 @@ class TrainATWorkspace(BaseWorkspace):
+                             'train_encoder_loss': encoder_loss,
+                             'train_vae_recon_loss': vae_recon_loss
+                         }
++                        # structured residual latent terms (model.py residual_losses)
++                        step_log.update({f'train_{k}': v for k, v in loss_metric_dict.items() if k.startswith(('res_', 'struct_'))})
+                         if "vq_code" in loss_metric_dict:
+                             n_different_codes = len(torch.unique(loss_metric_dict["vq_code"]))
+                             n_different_combinations = len(torch.unique(loss_metric_dict["vq_code"], dim=0))
+diff --git a/reactive_diffusion_policy/workspace/train_diffusion_unet_image_workspace.py b/reactive_diffusion_policy/workspace/train_diffusion_unet_image_workspace.py
+index 1e4a477..62a2350 100644
+--- a/reactive_diffusion_policy/workspace/train_diffusion_unet_image_workspace.py
++++ b/reactive_diffusion_policy/workspace/train_diffusion_unet_image_workspace.py
+@@ -1,3 +1,402 @@
++# if __name__ == "__main__":
++#     import sys
++#     import os
++#     import pathlib
++
++#     ROOT_DIR = str(pathlib.Path(__file__).parent.parent.parent)
++#     sys.path.append(ROOT_DIR)
++#     os.chdir(ROOT_DIR)
++
++# import os
++# import hydra
++# import torch
++# from omegaconf import OmegaConf
++# import pathlib
++# from torch.utils.data import DataLoader
++# import copy
++# import random
++# import wandb
++# import tqdm
++# import numpy as np
++# import shutil
++# import pickle
++# from reactive_diffusion_policy.workspace.base_workspace import BaseWorkspace
++# from reactive_diffusion_policy.policy.diffusion_unet_image_policy import DiffusionUnetImagePolicy
++# from reactive_diffusion_policy.dataset.base_dataset import BaseImageDataset
++# from reactive_diffusion_policy.common.checkpoint_util import TopKCheckpointManager
++# from reactive_diffusion_policy.common.json_logger import JsonLogger
++# from reactive_diffusion_policy.common.pytorch_util import dict_apply, optimizer_to
++# from reactive_diffusion_policy.model.diffusion.ema_model import EMAModel
++# from reactive_diffusion_policy.model.common.lr_scheduler import get_scheduler
++# from reactive_diffusion_policy.model.common.lr_decay import param_groups_lrd
++# from accelerate import Accelerator
++
++# OmegaConf.register_new_resolver("eval", eval, replace=True)
++
++# class TrainDiffusionUnetImageWorkspace(BaseWorkspace):
++#     include_keys = ['global_step', 'epoch']
++
++#     def __init__(self, cfg: OmegaConf, output_dir=None):
++#         super().__init__(cfg, output_dir=output_dir)
++
++#         # set seed
++#         seed = cfg.training.seed
++#         torch.manual_seed(seed)
++#         np.random.seed(seed)
++#         random.seed(seed)
++
++#         # configure model
++#         self.model: DiffusionUnetImagePolicy = hydra.utils.instantiate(cfg.policy)
++
++#         self.ema_model: DiffusionUnetImagePolicy = None
++#         if cfg.training.use_ema:
++#             self.ema_model = copy.deepcopy(self.model)
++
++#         # configure training state
++
++#         if 'timm' in cfg.policy.obs_encoder._target_:
++#             if cfg.training.layer_decay < 1.0:
++#                 assert not cfg.policy.obs_encoder.use_lora
++#                 assert not cfg.policy.obs_encoder.share_rgb_model
++#                 obs_encorder_param_groups = param_groups_lrd(self.model.obs_encoder,
++#                                                              shape_meta=cfg.shape_meta,
++#                                                              weight_decay=cfg.optimizer.encoder_weight_decay,
++#                                                              no_weight_decay_list=self.model.obs_encoder.no_weight_decay(),
++#                                                              layer_decay=cfg.training.layer_decay)
++#                 count = 0
++#                 for group in obs_encorder_param_groups:
++#                     count += len(group['params'])
++#                 if cfg.policy.obs_encoder.feature_aggregation == 'map':
++#                     obs_encorder_param_groups.extend([{'params': self.model.obs_encoder.attn_pool.parameters()}])
++#                     for _ in self.model.obs_encoder.attn_pool.parameters():
++#                         count += 1
++#                 print(f'obs_encorder params: {count}')
++#                 param_groups = [{'params': self.model.model.parameters()}]
++#                 param_groups.extend(obs_encorder_param_groups)
++#             else:
++#                 obs_encorder_lr = cfg.optimizer.lr
++#                 if cfg.policy.obs_encoder.pretrained and not cfg.policy.obs_encoder.use_lora:
++#                     obs_encorder_lr *= cfg.training.encoder_lr_coefficient
++#                     print('==> reduce pretrained obs_encorder\'s lr')
++#                 obs_encorder_params = list()
++#                 for param in self.model.obs_encoder.parameters():
++#                     if param.requires_grad:
++#                         obs_encorder_params.append(param)
++#                 print(f'obs_encorder params: {len(obs_encorder_params)}')
++#                 param_groups = [
++#                     {'params': self.model.model.parameters()},
++#                     {'params': obs_encorder_params, 'lr': obs_encorder_lr}
++#                 ]
++#             optimizer_cfg = OmegaConf.to_container(cfg.optimizer, resolve=True)
++#             optimizer_cfg.pop('_target_')
++#             if 'encoder_weight_decay' in optimizer_cfg.keys():
++#                 optimizer_cfg.pop('encoder_weight_decay')
++#             self.optimizer = torch.optim.AdamW(
++#                 params=param_groups,
++#                 **optimizer_cfg
++#             )
++#         else:
++#             optimizer_cfg = OmegaConf.to_container(cfg.optimizer, resolve=True)
++#             optimizer_cfg.pop('encoder_weight_decay')
++#             # hack: use larger learning rate for multiple gpus
++#             accelerator = Accelerator()
++#             cuda_count = accelerator.num_processes
++#             print("###########################################")
++#             print(f"Number of available CUDA devices: {cuda_count}.")
++#             print(f"Original learning rate: {optimizer_cfg['lr']}")
++#             optimizer_cfg['lr'] = optimizer_cfg['lr'] * cuda_count
++#             print(f"Updated learning rate: {optimizer_cfg['lr']}")
++#             print("###########################################")
++#             self.optimizer = hydra.utils.instantiate(
++#                 optimizer_cfg, params=self.model.parameters())
++
++#         # configure training state
++#         self.global_step = 0
++#         self.epoch = 0
++
++#     def run(self):
++#         cfg = copy.deepcopy(self.cfg)
++
++#         accelerator = Accelerator(log_with='wandb')
++#         wandb_cfg = OmegaConf.to_container(cfg.logging, resolve=True)
++#         wandb_cfg.pop('project')
++#         accelerator.init_trackers(
++#             project_name=cfg.logging.project,
++#             config=OmegaConf.to_container(cfg, resolve=True),
++#             init_kwargs={"wandb": wandb_cfg}
++#         )
++
++#         # resume training
++#         if cfg.training.resume:
++#             lastest_ckpt_path = self.get_checkpoint_path()
++#             if lastest_ckpt_path.is_file():
++#                 accelerator.print(f"Resuming from checkpoint {lastest_ckpt_path}")
++#                 self.load_checkpoint(path=lastest_ckpt_path)
++
++#         # configure dataset
++#         dataset: BaseImageDataset
++#         dataset = hydra.utils.instantiate(cfg.task.dataset)
++#         assert isinstance(dataset, BaseImageDataset)
++#         train_dataloader = DataLoader(dataset, **cfg.dataloader)
++        
++#         # normalizer = dataset.get_normalizer()
++#         # compute normalizer on the main process and save to disk
++#         normalizer_path = os.path.join(self.output_dir, 'normalizer.pkl')
++#         if accelerator.is_main_process:
++#             normalizer = dataset.get_normalizer()
++#             with open(normalizer_path, 'wb') as f:
++#                 pickle.dump(normalizer, f)
++
++#         # load normalizer on all processes
++#         accelerator.wait_for_everyone()
++#         normalizer = pickle.load(open(normalizer_path, 'rb'))
++
++#         # configure validation dataset
++#         val_dataset = dataset.get_validation_dataset()
++#         val_dataloader = DataLoader(val_dataset, **cfg.val_dataloader)
++
++#         self.model.set_normalizer(normalizer)
++#         if cfg.training.use_ema:
++#             self.ema_model.set_normalizer(normalizer)
++
++#         # configure lr scheduler
++#         lr_scheduler = get_scheduler(
++#             cfg.training.lr_scheduler,
++#             optimizer=self.optimizer,
++#             num_warmup_steps=cfg.training.lr_warmup_steps,
++#             num_training_steps=(
++#                 len(train_dataloader) * cfg.training.num_epochs) \
++#                     // cfg.training.gradient_accumulate_every,
++#             # pytorch assumes stepping LRScheduler every epoch
++#             # however huggingface diffusers steps it every batch
++#             last_epoch=self.global_step-1
++#         )
++
++#         # configure ema
++#         ema: EMAModel = None
++#         if cfg.training.use_ema:
++#             ema = hydra.utils.instantiate(
++#                 cfg.ema,
++#                 model=self.ema_model)
++
++#         # configure logging
++#         # wandb_run = wandb.init(
++#         #     dir=str(self.output_dir),
++#         #     config=OmegaConf.to_container(cfg, resolve=True),
++#         #     **cfg.logging
++#         # )
++#         # wandb.config.update(
++#         #     {
++#         #         "output_dir": self.output_dir,
++#         #     }
++#         # )
++
++#         # configure checkpoint
++#         topk_manager = TopKCheckpointManager(
++#             save_dir=os.path.join(self.output_dir, 'checkpoints'),
++#             **cfg.checkpoint.topk
++#         )
++
++#         # accelerator
++#         train_dataloader, val_dataloader, self.model, self.optimizer, lr_scheduler = accelerator.prepare(
++#             train_dataloader, val_dataloader, self.model, self.optimizer, lr_scheduler
++#         )
++#         if accelerator.state.num_processes > 1:
++#             self.model = torch.nn.parallel.DistributedDataParallel(
++#                 accelerator.unwrap_model(self.model),
++#                 device_ids=[self.model.device],
++#                 find_unused_parameters=True
++#             )
++
++#         # device transfer
++#         device = self.model.device
++#         if self.ema_model is not None:
++#             self.ema_model.to(device)
++
++#         # save batch for sampling
++#         train_sampling_batch = None
++
++#         if cfg.training.debug:
++#             cfg.training.num_epochs = 2
++#             cfg.training.max_train_steps = 3
++#             cfg.training.max_val_steps = 3
++#             cfg.training.rollout_every = 1
++#             cfg.training.checkpoint_every = 1
++#             cfg.training.val_every = 1
++#             cfg.training.sample_every = 1
++
++#         # training loop
++#         log_path = os.path.join(self.output_dir, 'logs.json.txt')
++#         with JsonLogger(log_path) as json_logger:
++#             for local_epoch_idx in range(cfg.training.num_epochs):
++#                 step_log = dict()
++#                 # ========= train for this epoch ==========
++#                 if cfg.training.freeze_encoder:
++#                     self.model.obs_encoder.eval()
++#                     self.model.obs_encoder.requires_grad_(False)
++
++#                 train_losses = list()
++#                 with tqdm.tqdm(train_dataloader, desc=f"Training epoch {self.epoch}", 
++#                         leave=False, mininterval=cfg.training.tqdm_interval_sec) as tepoch:
++#                     for batch_idx, batch in enumerate(tepoch):
++#                         # device transfer
++#                         batch = dict_apply(batch, lambda x: x.to(device, non_blocking=True))
++#                         if train_sampling_batch is None:
++#                             train_sampling_batch = batch
++
++#                         # compute loss
++#                         raw_loss = self.model(batch)    # model forward
++#                         loss = raw_loss / cfg.training.gradient_accumulate_every
++#                         accelerator.backward(loss)      # model backward
++
++#                         # step optimizer
++#                         if self.global_step % cfg.training.gradient_accumulate_every == 0:
++#                             self.optimizer.step()
++#                             self.optimizer.zero_grad()
++#                             lr_scheduler.step()
++                        
++#                         # update ema
++#                         if cfg.training.use_ema:
++#                             ema.step(accelerator.unwrap_model(self.model))
++
++#                         # logging
++#                         raw_loss_cpu = raw_loss.item()
++#                         tepoch.set_postfix(loss=raw_loss_cpu, refresh=False)
++#                         train_losses.append(raw_loss_cpu)
++#                         step_log = {
++#                             'train_loss': raw_loss_cpu,
++#                             'global_step': self.global_step,
++#                             'epoch': self.epoch,
++#                             'lr': lr_scheduler.get_last_lr()[0]
++#                         }
++
++#                         is_last_batch = (batch_idx == (len(train_dataloader)-1))
++#                         if not is_last_batch:
++#                             # log of last step is combined with validation and rollout
++#                             accelerator.log(step_log, step=self.global_step)
++#                             json_logger.log(step_log)
++#                             self.global_step += 1
++
++#                         if (cfg.training.max_train_steps is not None) \
++#                             and batch_idx >= (cfg.training.max_train_steps-1):
++#                             break
++
++#                 # at the end of each epoch
++#                 # replace train_loss with epoch average
++#                 train_loss = np.mean(train_losses)
++#                 step_log['train_loss'] = train_loss
++
++#                 # ========= eval for this epoch ==========
++#                 policy = accelerator.unwrap_model(self.model)
++#                 if cfg.training.use_ema:
++#                     policy = self.ema_model
++#                 policy.eval()
++
++#                 # run validation
++#                 if cfg.task.dataset.val_ratio > 0 and (self.epoch % cfg.training.val_every) == 0 and accelerator.is_main_process:
++#                     with torch.no_grad():
++#                         val_losses = list()
++#                         with tqdm.tqdm(val_dataloader, desc=f"Validation epoch {self.epoch}", 
++#                                 leave=False, mininterval=cfg.training.tqdm_interval_sec) as tepoch:
++#                             for batch_idx, batch in enumerate(tepoch):
++#                                 batch = dict_apply(batch, lambda x: x.to(device, non_blocking=True))
++#                                 loss = self.model(batch)
++#                                 val_losses.append(loss)
++#                                 if (cfg.training.max_val_steps is not None) \
++#                                     and batch_idx >= (cfg.training.max_val_steps-1):
++#                                     break
++#                         if len(val_losses) > 0:
++#                             val_loss = torch.mean(torch.tensor(val_losses)).item()
++#                             # log epoch average validation loss
++#                             step_log['val_loss'] = val_loss
++
++#                 # run diffusion sampling on a training batch
++#                 if (self.epoch % cfg.training.sample_every) == 0:
++#                     with torch.no_grad():
++#                         # sample trajectory from training set, and evaluate difference
++#                         batch = dict_apply(train_sampling_batch, lambda x: x.to(device, non_blocking=True))
++#                         obs_dict = batch['obs']
++#                         extended_obs_dict = batch['extended_obs']
++#                         gt_action = batch['action']
++
++#                         if 'latent' in cfg.name:
++#                             dataset_obs_temporal_downsample_ratio = cfg.task.dataset.obs_temporal_downsample_ratio
++#                             result = policy.predict_action(obs_dict,
++#                                                            extended_obs_dict=extended_obs_dict,
++#                                                            dataset_obs_temporal_downsample_ratio=dataset_obs_temporal_downsample_ratio)
++#                         else:
++#                             result = policy.predict_action(obs_dict)
++#                         pred_action = result['action_pred']
++
++#                         all_preds, all_gt = accelerator.gather_for_metrics((pred_action, gt_action))
++
++#                         mse = torch.nn.functional.mse_loss(all_preds, all_gt)
++#                         step_log['train_action_mse_error'] = mse.item()
++#                         del batch
++#                         del obs_dict
++#                         del gt_action
++#                         del result
++#                         del pred_action
++#                         del mse
++#                 accelerator.wait_for_everyone()
++                
++#                 # checkpoint
++#                 if (self.epoch % cfg.training.checkpoint_every) == 0 and accelerator.is_main_process:
++#                     # unwrap the model to save ckpt
++#                     model_ddp = self.model
++#                     self.model = accelerator.unwrap_model(self.model)
++
++#                     # checkpointing
++#                     if cfg.checkpoint.save_last_ckpt:
++#                         self.save_checkpoint()
++#                     if cfg.checkpoint.save_last_snapshot:
++#                         self.save_snapshot()
++
++#                     # sanitize metric names
++#                     metric_dict = dict()
++#                     for key, value in step_log.items():
++#                         new_key = key.replace('/', '_')
++#                         metric_dict[new_key] = value
++                    
++#                     # We can't copy the last checkpoint here
++#                     # since save_checkpoint uses threads.
++#                     # therefore at this point the file might have been empty!
++#                     topk_ckpt_path = topk_manager.get_ckpt_path(metric_dict)
++
++#                     if topk_ckpt_path is not None:
++#                         self.save_checkpoint(path=topk_ckpt_path)
++
++#                     # recover the DDP model
++#                     self.model = model_ddp
++                    
++#                 # ========= eval end for this epoch ==========
++#                 policy.train()
++
++#                 # end of epoch
++#                 # log of last step is combined with validation and rollout
++#                 accelerator.log(step_log, step=self.global_step)
++#                 json_logger.log(step_log)
++#                 self.global_step += 1
++#                 self.epoch += 1
++
++#         accelerator.end_training()
++
++# @hydra.main(
++#     version_base=None,
++#     config_path=str(pathlib.Path(__file__).parent.parent.joinpath("config")), 
++#     config_name=pathlib.Path(__file__).stem)
++# def main(cfg):
++#     workspace = TrainDiffusionUnetImageWorkspace(cfg)
++#     workspace.run()
++
++# if __name__ == "__main__":
++#     main()
++
++
++
++
++
++###################################33 eval code #################################
+ if __name__ == "__main__":
+     import sys
+     import os
+@@ -48,6 +447,25 @@ class TrainDiffusionUnetImageWorkspace(BaseWorkspace):
+         # configure model
+         self.model: DiffusionUnetImagePolicy = hydra.utils.instantiate(cfg.policy)
+ 
++        # Opt-in (structured-AT study 2026-10-05): start obs_encoder from another LDP checkpoint (its EMA copy, the
++        # one every server deploys) and keep its parameters fixed, so features computed by policy.obs_encoder -- the
++        # learned verifier's 2078-d input -- are bit-identical to that checkpoint. The encoder stays in train mode
++        # (same RandomCrop augmentation as the original run); it has GroupNorm only, so no running statistics move,
++        # and EMAModel copies requires_grad=False parameters verbatim. Defaults: both off = unchanged behaviour.
++        init_enc = cfg.training.get('init_obs_encoder_ckpt', None)
++        self.freeze_obs_encoder_params = bool(cfg.training.get('freeze_obs_encoder_params', False))
++        if init_enc:
++            import dill
++            payload = torch.load(open(init_enc, 'rb'), pickle_module=dill, map_location='cpu')
++            sd = payload['state_dicts']['ema_model' if 'ema_model' in payload['state_dicts'] else 'model']
++            enc = {k[len('obs_encoder.'):]: v for k, v in sd.items() if k.startswith('obs_encoder.')}
++            self.model.obs_encoder.load_state_dict(enc, strict=True)
++            del payload, sd
++            print(f'[workspace] obs_encoder initialised from {init_enc} ({len(enc)} tensors)')
++        if self.freeze_obs_encoder_params:
++            self.model.obs_encoder.requires_grad_(False)
++            print('[workspace] obs_encoder parameters frozen')
++
+         self.ema_model: DiffusionUnetImagePolicy = None
+         if cfg.training.use_ema:
+             self.ema_model = copy.deepcopy(self.model)
+@@ -107,8 +525,11 @@ class TrainDiffusionUnetImageWorkspace(BaseWorkspace):
+             optimizer_cfg['lr'] = optimizer_cfg['lr'] * cuda_count
+             print(f"Updated learning rate: {optimizer_cfg['lr']}")
+             print("###########################################")
++            params = self.model.parameters()
++            if self.freeze_obs_encoder_params:
++                params = [p for p in params if p.requires_grad]
+             self.optimizer = hydra.utils.instantiate(
+-                optimizer_cfg, params=self.model.parameters())
++                optimizer_cfg, params=params)
+ 
+         # configure training state
+         self.global_step = 0
+@@ -123,7 +544,11 @@ class TrainDiffusionUnetImageWorkspace(BaseWorkspace):
+         accelerator.init_trackers(
+             project_name=cfg.logging.project,
+             config=OmegaConf.to_container(cfg, resolve=True),
+-            init_kwargs={"wandb": wandb_cfg}
++            # init_kwargs={"wandb": wandb_cfg}
++            init_kwargs={"wandb": {
++                "config":
++                {"allow_val_change": True}  # 👈 이 줄 추가
++            }}
+         )
+ 
+         # resume training
+@@ -139,7 +564,6 @@ class TrainDiffusionUnetImageWorkspace(BaseWorkspace):
+         assert isinstance(dataset, BaseImageDataset)
+         train_dataloader = DataLoader(dataset, **cfg.dataloader)
+         
+-        # normalizer = dataset.get_normalizer()
+         # compute normalizer on the main process and save to disk
+         normalizer_path = os.path.join(self.output_dir, 'normalizer.pkl')
+         if accelerator.is_main_process:
+@@ -159,6 +583,52 @@ class TrainDiffusionUnetImageWorkspace(BaseWorkspace):
+         if cfg.training.use_ema:
+             self.ema_model.set_normalizer(normalizer)
+ 
++        # Opt-in (dagger_std_r1 2026-10-13): fine-tune from a trained LDP checkpoint. Model and EMA both start from the
++        # checkpoint's EMA weights (the deployed policy) including its normalizer (obs, action, latent), so the fixed AT
++        # keeps the normalizer it was paired with; normalizer.pkl is overwritten with it. Default off = unchanged.
++        init_model = cfg.training.get('init_model_ckpt', None)
++        if init_model:
++            import dill
++            payload = torch.load(open(init_model, 'rb'), pickle_module=dill, map_location='cpu')
++            sd = payload['state_dicts']['ema_model' if 'ema_model' in payload['state_dicts'] else 'model']
++            self.model.load_state_dict(sd, strict=True)
++            if cfg.training.use_ema:
++                self.ema_model.load_state_dict(sd, strict=True)
++            normalizer = self.model.normalizer
++            if accelerator.is_main_process:
++                with open(normalizer_path, 'wb') as f:
++                    pickle.dump(normalizer, f)
++            del payload, sd
++            print(f'[workspace] model and EMA initialised from {init_model} (strict, incl. normalizer)')
++            # Opt-in (usb_keyed_s5d 2026-11-02): refit ONLY the latent_action normalizer on this dataset, through the inherited
++            # action normalizer + fixed AT encoder exactly as compute_loss builds the targets (posterior sample). With the
++            # inherited latent range, new-mode latents (keyed-USB rotation) sat outside [-1, 1] and DDIM clip_sample cut them
++            # off (usb_keyed_s5b / s5c). obs / action normalizers and the AT stay as inherited. Default off = unchanged.
++            if cfg.training.get('refit_latent_normalizer', False):
++                import einops
++                from reactive_diffusion_policy.model.common.normalizer import SingleFieldLinearNormalizer
++                m = self.model
++                an = copy.deepcopy(m.normalizer['action']).to(m.at.device)
++                lat_all = []
++                with torch.no_grad():
++                    for i in range(len(dataset)):
++                        act = dataset[i]['action'].to(m.at.device).unsqueeze(0)
++                        z = m.at.encoder(m.at.preprocess(an.normalize(act) / m.at.act_scale))
++                        z, _ = m.at.quant_state_without_vq(z)
++                        lat_all.append(einops.rearrange(z, 'N (T A) -> N T A', T=m.horizon)[0].cpu().numpy())
++                lat_all = np.concatenate(lat_all, 0)
++                old = copy.deepcopy(m.normalizer['latent_action']).to('cpu').normalize(torch.as_tensor(lat_all)).abs()
++                new = SingleFieldLinearNormalizer.create_fit(lat_all)
++                m.normalizer['latent_action'] = new
++                if cfg.training.use_ema:
++                    self.ema_model.normalizer['latent_action'] = copy.deepcopy(new)
++                normalizer = m.normalizer
++                if accelerator.is_main_process:
++                    with open(normalizer_path, 'wb') as f:
++                        pickle.dump(normalizer, f)
++                print(f'[workspace] latent_action normalizer refit on {len(dataset)} samples; under the inherited one '
++                      f'{float((old > 1).float().mean()):.4f} of values were outside [-1, 1] (max {float(old.max()):.2f})')
++
+         # configure lr scheduler
+         lr_scheduler = get_scheduler(
+             cfg.training.lr_scheduler,
+@@ -228,7 +698,12 @@ class TrainDiffusionUnetImageWorkspace(BaseWorkspace):
+         # training loop
+         log_path = os.path.join(self.output_dir, 'logs.json.txt')
+         with JsonLogger(log_path) as json_logger:
+-            for local_epoch_idx in range(cfg.training.num_epochs):
++            # self.epoch is restored from the checkpoint on resume (see
++            # above); range(cfg.training.num_epochs) alone would run that
++            # many *more* epochs on top of wherever we resumed from, blowing
++            # past the configured total and cycling the (non-clamped) LR
++            # schedule back up past its intended zero point.
++            for local_epoch_idx in range(cfg.training.num_epochs - self.epoch):
+                 step_log = dict()
+                 # ========= train for this epoch ==========
+                 if cfg.training.freeze_encoder:
+@@ -236,7 +711,7 @@ class TrainDiffusionUnetImageWorkspace(BaseWorkspace):
+                     self.model.obs_encoder.requires_grad_(False)
+ 
+                 train_losses = list()
+-                with tqdm.tqdm(train_dataloader, desc=f"Training epoch {self.epoch}", 
++                with tqdm.tqdm(train_dataloader, desc=f"Training epoch {self.epoch}",
+                         leave=False, mininterval=cfg.training.tqdm_interval_sec) as tepoch:
+                     for batch_idx, batch in enumerate(tepoch):
+                         # device transfer
+@@ -245,16 +720,16 @@ class TrainDiffusionUnetImageWorkspace(BaseWorkspace):
+                             train_sampling_batch = batch
+ 
+                         # compute loss
+-                        raw_loss = self.model(batch)
++                        raw_loss = self.model(batch)    # model forward
+                         loss = raw_loss / cfg.training.gradient_accumulate_every
+-                        accelerator.backward(loss)
++                        accelerator.backward(loss)      # model backward
+ 
+                         # step optimizer
+                         if self.global_step % cfg.training.gradient_accumulate_every == 0:
+                             self.optimizer.step()
+                             self.optimizer.zero_grad()
+                             lr_scheduler.step()
+-                        
++
+                         # update ema
+                         if cfg.training.use_ema:
+                             ema.step(accelerator.unwrap_model(self.model))
+@@ -288,15 +763,17 @@ class TrainDiffusionUnetImageWorkspace(BaseWorkspace):
+ 
+                 # ========= eval for this epoch ==========
+                 policy = accelerator.unwrap_model(self.model)
++                # policy = self.model
+                 if cfg.training.use_ema:
+                     policy = self.ema_model
+                 policy.eval()
++                log_data = []
+ 
+                 # run validation
+                 if cfg.task.dataset.val_ratio > 0 and (self.epoch % cfg.training.val_every) == 0 and accelerator.is_main_process:
+                     with torch.no_grad():
+                         val_losses = list()
+-                        with tqdm.tqdm(val_dataloader, desc=f"Validation epoch {self.epoch}", 
++                        with tqdm.tqdm(val_dataloader, desc=f"Validation epoch {self.epoch}",
+                                 leave=False, mininterval=cfg.training.tqdm_interval_sec) as tepoch:
+                             for batch_idx, batch in enumerate(tepoch):
+                                 batch = dict_apply(batch, lambda x: x.to(device, non_blocking=True))
+@@ -311,37 +788,67 @@ class TrainDiffusionUnetImageWorkspace(BaseWorkspace):
+                             step_log['val_loss'] = val_loss
+ 
+                 # run diffusion sampling on a training batch
+-                if (self.epoch % cfg.training.sample_every) == 0:
++                if (self.epoch % cfg.training.sample_every) == 0 and train_sampling_batch is not None:
+                     with torch.no_grad():
+-                        # sample trajectory from training set, and evaluate difference
+-                        batch = dict_apply(train_sampling_batch, lambda x: x.to(device, non_blocking=True))
+-                        obs_dict = batch['obs']
+-                        extended_obs_dict = batch['extended_obs']
+-                        gt_action = batch['action']
+-
+-                        if 'latent' in cfg.name:
+-                            dataset_obs_temporal_downsample_ratio = cfg.task.dataset.obs_temporal_downsample_ratio
+-                            result = policy.predict_action(obs_dict,
+-                                                           extended_obs_dict=extended_obs_dict,
+-                                                           dataset_obs_temporal_downsample_ratio=dataset_obs_temporal_downsample_ratio)
+-                        else:
+-                            result = policy.predict_action(obs_dict)
+-                        pred_action = result['action_pred']
+-
+-                        all_preds, all_gt = accelerator.gather_for_metrics((pred_action, gt_action))
+-
+-                        mse = torch.nn.functional.mse_loss(all_preds, all_gt)
+-                        step_log['train_action_mse_error'] = mse.item()
+-                        del batch
+-                        del obs_dict
+-                        del gt_action
+-                        del result
+-                        del pred_action
+-                        del mse
++                        # One cached batch, not the whole loader. train_sampling_batch is
++                        # captured for exactly this at line ~651 but was going unused, so
++                        # every sample_every epochs ran full-dataset diffusion sampling:
++                        # 700 batches x 100 DDIM steps took 19 min per pass with three
++                        # image keys, ~4 h across a 121-epoch run, and wrote a 210 MB
++                        # inference_log.json each time. The metric it produces is a
++                        # single-batch train MSE that measured 3x off from the offline
++                        # probe anyway -- rollout success rate is the criterion that
++                        # matters, so paying for the full pass buys nothing.
++                        for batch in [train_sampling_batch]:
++                            # sample trajectory from training set, and evaluate difference
++                            batch = dict_apply(batch, lambda x: x.to(device, non_blocking=True))
++                            obs_dict = batch['obs']
++                            print(f"obs_dict keys: {obs_dict.keys()}")
++                            extended_obs_dict = batch['extended_obs']
++                            gt_action = batch['action']
++
++                            if 'latent' in cfg.name:
++                                dataset_obs_temporal_downsample_ratio = cfg.task.dataset.obs_temporal_downsample_ratio
++                                result = policy.predict_action(obs_dict,
++                                                            extended_obs_dict=extended_obs_dict,
++                                                            dataset_obs_temporal_downsample_ratio=dataset_obs_temporal_downsample_ratio)
++                            else:
++                                result = policy.predict_action(obs_dict)
++                            pred_action = result['action_pred']
++
++                            all_preds, all_gt = accelerator.gather_for_metrics((pred_action, gt_action))
++                            # all_preds, all_gt = pred_action, gt_action
++
++                            pose_key = 'left_robot_tcp_pose' if 'left_robot_tcp_pose' in obs_dict \
++                                else ('state' if 'state' in obs_dict else None)
++                            for i in range(gt_action.shape[0]):
++                                entry = {
++                                    'gt_action': gt_action[i].cpu().numpy().tolist(),
++                                    'pred_action': pred_action[i].cpu().numpy().tolist(),
++                                }
++                                if pose_key is not None:
++                                    entry['tcp_pose'] = obs_dict[pose_key][i].cpu().numpy().tolist()
++                                log_data.append(entry)
++
++                            mse = torch.nn.functional.mse_loss(all_preds, all_gt)
++                            step_log['train_action_mse_error'] = mse.item()
++                            del batch
++                            del obs_dict
++                            del gt_action
++                            del result
++                            del pred_action
++                            del mse
++                log_file = os.path.join(self.output_dir, 'inference_log.json')
++                with open(log_file, 'w') as f:
++                    import json
++                    json.dump(log_data, f, indent=2)
++
++                print(f"[INFO] Inference log saved to {log_file}")
+                 accelerator.wait_for_everyone()
+                 
+                 # checkpoint
+                 if (self.epoch % cfg.training.checkpoint_every) == 0 and accelerator.is_main_process:
++                # if (self.epoch % cfg.training.checkpoint_every) == 0:
+                     # unwrap the model to save ckpt
+                     model_ddp = self.model
+                     self.model = accelerator.unwrap_model(self.model)
+@@ -370,11 +877,12 @@ class TrainDiffusionUnetImageWorkspace(BaseWorkspace):
+                     self.model = model_ddp
+                     
+                 # ========= eval end for this epoch ==========
+-                policy.train()
++                # policy.train()
+ 
+                 # end of epoch
+                 # log of last step is combined with validation and rollout
+                 accelerator.log(step_log, step=self.global_step)
++                # wandb_run.log(step_log, step=self.global_step)
+                 json_logger.log(step_log)
+                 self.global_step += 1
+                 self.epoch += 1
