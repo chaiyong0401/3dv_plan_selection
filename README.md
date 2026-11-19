@@ -10,7 +10,7 @@
 ┌──────────────────────────────────────┐            ┌───────────────────────────────────────────┐
 │ 생성기: LDP(latent diffusion) → 후보 16개 │            │ 보정기(잔차): 생성기 action + δ            │
 │        AT 디코더(촉각으로 재디코딩)        │            │  x,y : 보정량 (hand frame, ±0.2)          │
-│ Q (IQL 앙상블 9개): 후보 점수              │──선택──▶   │  rz  : 크기 = 잔차 |rz|, 방향 = sign(−ê)  │
+│ Q (IQL 앙상블 9개): 후보 점수              │──선택──▶   │  rz  : 보정량 (ER3 확장 시 방향 = sign(−ê))│
 │ 정지 규칙: 정지 2회 연속 전에는 "유지" 후보만 │            └───────────────────────────────────────────┘
 └──────────────────────────────────────┘
 정지 = 24 스텝 손 이동 < 3 mm. 손이 다시 움직이면 정지 카운트 리셋.
@@ -36,7 +36,7 @@
 | `manifeel_side/delta_residual_handframe_20261106.py` | 손 좌표계 변환 (`to_hand`) |
 | `manifeel_side/delta_residual_conv_20261111.py` | 현재 기본 보정기 (수렴 헤드 포함) |
 | `manifeel_side/delta_residual_linsign_20261117.py`, `..._b2_20261117.py` | B-2: 전환 뒤 rz 부호를 선형 모델로 |
-| `manifeel_side/delta_residual_errsim3_20261118.py`, `eval_rdp_bridge_usb_keyed_rt_errsim3_20261118.py` | **권장 기본 (ER3)**: rz = \|잔차 rz\| · sign(−ê). 크기(언제·얼마나)는 기존 잔차, 방향은 yaw 오차 헤드 ê. 게이트·문턱 없음. `RDP_ERRNET2`=errnet2.pt, `train_err2.OneNet`을 import하므로 `train/rz_errhead/`를 `PYTHONPATH`에 추가 |
+| `manifeel_side/delta_residual_errsim3_20261118.py`, `eval_rdp_bridge_usb_keyed_rt_errsim3_20261118.py` | **선택 확장 (ER3, 논문의 본 방법은 잔차 보정기)**: rz = \|잔차 rz\| · sign(−ê). 크기(언제·얼마나)는 기존 잔차, 방향은 yaw 오차 헤드 ê. 게이트·문턱 없음. `RDP_ERRNET2`=errnet2.pt, `train_err2.OneNet`을 import하므로 `train/rz_errhead/`를 `PYTHONPATH`에 추가 |
 | `manifeel_side/delta_residual_errsim_20261118.py` | (기각) rz = 1[g>0]·clip(clip(−0.1745·ê, ±0.3) − 생성기 rz, ±0.2): 학습한 게이트가 오프라인 관문 실패 |
 | `manifeel_side/delta_residual_rz0_20261118.py` | 대조: rz 출력 0 |
 | `manifeel_side/eval_rdp_bridge_usb_keyed_rt_*.py` | 시뮬레이터 브리지 (참고용: 실행 지연 2, refresh 12, 잔차 호출 순서) |
