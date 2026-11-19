@@ -6,7 +6,7 @@ training code reads (reactive_diffusion_policy RealImageTactileDataset):
   data/state               (T, 7) float32
   data/contact_8d_right    (T, 8) float32
   data/action              (T, 6) float32   the step command the controller received (policy units)
-  data/source              (T,) int8        20 = human demonstration, 21 = policy, 22 = human take-over
+  data/source              (T,) int8        20 = human demonstration, 21 = policy, 22 = human take-over (local correction), 23 = human take-over (mode switch)
   data/phase               (T,) int8        0 (kept for the loss-mask convention of the existing datasets)
   meta/episode_ends        (E,) int64
 Extra per-step fields (tactile_raw, cmd_policy, cmd_residual, takeover flag, timing) stay in the npz files.
@@ -16,7 +16,7 @@ import time
 
 import numpy as np
 
-SOURCE = {'demo': 20, 'policy': 21, 'takeover': 22}
+SOURCE = {'demo': 20, 'policy': 21, 'takeover': 22, 'takeover_switch': 23}   # 22 = local correction (residual labels), 23 = mode switch (generator data only)
 CAMERAS = ('wrist', 'front')
 
 
@@ -29,7 +29,7 @@ class EpisodeRecorder:
 
     def add(self, frame, label_cmd, kind, **extra):
         """frame: the observation the command was computed from; label_cmd: (6,) command sent to the controller;
-        kind: 'demo' | 'policy' | 'takeover'."""
+        kind: 'demo' | 'policy' | 'takeover' | 'takeover_switch'."""
         img = lambda x: np.clip(np.moveaxis(np.asarray(x[0]), 0, -1) * 255.0 + 0.5, 0, 255).astype(np.uint8)
         s = {c: img(frame[c]) for c in CAMERAS if c in frame}
         s.update(state=np.asarray(frame['state'][0], np.float32),
