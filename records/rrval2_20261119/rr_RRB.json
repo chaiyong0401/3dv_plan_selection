@@ -1,0 +1,13 @@
+{
+ "ldp_ckpt": "/home/dyros-recruit/mcy_ws/reactive_diffusion_policy/data/outputs/2026.11.07/02.37.22_train_latent_diffusion_unet_image_manifeel_usbkeyed_s12z_f15_wrtkodose/checkpoints/latest.ckpt",
+ "at_ckpt": "/home/dyros-recruit/mcy_ws/reactive_diffusion_policy/data/outputs/2026.11.04/16.21.22_train_vae_manifeel_usbkeyed_normsplit_atmh/checkpoints/latest.ckpt",
+ "verifier_ckpts": "/home/dyros-recruit/mcy_ws/manifeel/manifeel/data/outputs/data_budget_20261110/ckpt/q_BAL_400_d0_s0.pt,/home/dyros-recruit/mcy_ws/manifeel/manifeel/data/outputs/data_budget_20261110/ckpt/q_BAL_400_d0_s1.pt,/home/dyros-recruit/mcy_ws/manifeel/manifeel/data/outputs/data_budget_20261110/ckpt/q_BAL_400_d0_s2.pt,/home/dyros-recruit/mcy_ws/manifeel/manifeel/data/outputs/data_budget_20261110/ckpt/q_BAL_400_d0_s3.pt,/home/dyros-recruit/mcy_ws/manifeel/manifeel/data/outputs/data_budget_20261110/ckpt/q_BAL_400_d0_s4.pt,/home/dyros-recruit/mcy_ws/manifeel/manifeel/data/outputs/data_budget_20261110/ckpt/q_BAL_400_d0_s5.pt,/home/dyros-recruit/mcy_ws/manifeel/manifeel/data/outputs/data_budget_20261110/ckpt/q_BAL_400_d0_s6.pt,/home/dyros-recruit/mcy_ws/manifeel/manifeel/data/outputs/data_budget_20261110/ckpt/q_BAL_400_d0_s7.pt,/home/dyros-recruit/mcy_ws/manifeel/manifeel/data/outputs/data_budget_20261110/ckpt/q_BAL_400_d0_s8.pt",
+ "evid_est": "/home/dyros-recruit/mcy_ws/manifeel/manifeel/data/outputs/evid4_cl_20261111/corr_est.npz",
+ "residual_ckpt": "/home/dyros-recruit/mcy_ws/manifeel/manifeel/data/outputs/nowr_cl_20261112/residual_conv.pt",
+ "delay": 2,
+ "xfade": 0,
+ "coh_lambda": 0.02,
+ "stall_mode": "mm",
+ "evid_k": 999,
+ "evid_fallback": 2
+}

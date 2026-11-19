@@ -1,0 +1,17 @@
+{
+ "robot_command_sent": false,
+ "RRB": {
+  "scenes": 200,
+  "success": 154,
+  "reference": 160,
+  "same_scenes": 178,
+  "rmst": 296.3,
+  "rmst_reference": 280.3,
+  "first_command_difference": {
+   "cohort": 76700,
+   "step": 3,
+   "diff": 0.0010153800249099731
+  },
+  "verdict": "CLOSE"
+ }
+}

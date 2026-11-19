@@ -1,0 +1,15 @@
+stallv_20261119 - result (2026-11-19, offline, CPU). robot_command_sent: false
+prereg.json sha b6ce24da..., run.py sha 15db3d17... Verdict: NOT_ADOPTED (V1 true, V2 false in all three sets, V3 true, V4 true). Recorded as is; no rerun.
+Threshold (linear Otsu of rho, dev) 0.205; refit FIRSTR 0.2015, QR 0.1961, BLOCK 0.2036 (also Q400B 0.2055, off arms 0.182-0.190).
+Mode test, corrector on, NEW vs OLD (TPR / FPR / AUROC):
+  FIRSTR 0.993 / 0.403 / 0.817  vs 0.997 / 0.340 / 0.875
+  QR     0.939 / 0.401 / 0.808  vs 0.980 / 0.302 / 0.893
+  BLOCK  1.000 / 0.356 / 0.832  vs 1.000 / 0.274 / 0.893
+  (Q400B, not for verdict: 1.000 / 0.380 / 0.815 vs 1.000 / 0.300 / 0.871)
+Off-on FPR contrast NEW: C1 0.917 - 0.403 = 0.514, C2 0.916 - 0.401 = 0.515.
+Delay vs OLD in flip episodes: median -6 / -5 / -5 steps, p90 +3.6 / +20.9 / +1.
+Exploratory: in right-mode (nonflip) episodes NEW flags 26 / 21 / 33 that OLD does not, OLD flags 7 / 1 / 8 that NEW does not; row agreement 0.88.
+Reading: the realization ratio at its data-driven threshold is a looser test: about 5 steps earlier, FPR +6 to +10 points, AUROC -0.06 to -0.085, in every set.
+It flags right-mode episodes in which the hand still moves (>= 3 mm net) but not along the command. Net displacement ("anything still changing") is the better
+mode test; this matches the claim that in the right mode the corrector keeps the hand moving.
+Two preregistered attempts in the commanded-vs-realized direction (stallu, stallv) are now negative.

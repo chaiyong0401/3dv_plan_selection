@@ -1,0 +1,205 @@
+{
+ "study": "stallu_20261119",
+ "robot_command_sent": false,
+ "thresholds": {
+  "RHO": {
+   "dev": {
+    "eta_linear": 0.7898,
+    "eta_log": 0.8219,
+    "th_linear": 0.205,
+    "th_log": 0.0079,
+    "pick": "log",
+    "threshold": 0.0079,
+    "share_below": 0.174
+   },
+   "holdout": {
+    "eta_linear": 0.7693,
+    "eta_log": 0.8147,
+    "th_linear": 0.204,
+    "th_log": 0.008,
+    "pick": "log",
+    "threshold": 0.008,
+    "share_below": 0.16
+   }
+  },
+  "U": {
+   "dev": {
+    "eta_linear": 0.7035,
+    "eta_log": 0.5851,
+    "th_linear": 50.2928,
+    "th_log": 30.6018,
+    "pick": "linear",
+    "threshold": 50.2928,
+    "share_below": 0.805
+   },
+   "holdout": {
+    "eta_linear": 0.6778,
+    "eta_log": 0.5867,
+    "th_linear": 47.9082,
+    "th_log": 28.8297,
+    "pick": "linear",
+    "threshold": 47.9082,
+    "share_below": 0.802
+   }
+  }
+ },
+ "mode_test": {
+  "Q400B_OLD": {
+   "TPR": 1.0,
+   "FPR": 0.3,
+   "AUROC": 0.871
+  },
+  "Q400B_R1": {
+   "TPR": 0.953,
+   "FPR": 0.145,
+   "AUROC": 0.924
+  },
+  "Q400B_RHO": {
+   "TPR": 0.646,
+   "FPR": 0.099,
+   "AUROC": 0.773
+  },
+  "Q400B_U": {
+   "TPR": 0.98,
+   "FPR": 0.997,
+   "AUROC": 0.458
+  },
+  "Q400B0_OLD": {
+   "TPR": 1.0,
+   "FPR": 0.898,
+   "AUROC": 0.572
+  },
+  "Q400B0_R1": {
+   "TPR": 0.939,
+   "FPR": 0.812,
+   "AUROC": 0.563
+  },
+  "Q400B0_RHO": {
+   "TPR": 0.768,
+   "FPR": 0.644,
+   "AUROC": 0.532
+  },
+  "Q400B0_U": {
+   "TPR": 0.993,
+   "FPR": 1.0,
+   "AUROC": 0.459
+  }
+ },
+ "delay_vs_OLD_flip": {
+  "R1": {
+   "n": 283,
+   "median": 3.0,
+   "p90": 25.0,
+   "mean": 8.6
+  },
+  "RHO": {
+   "n": 192,
+   "median": 52.5,
+   "p90": 108.60000000000002,
+   "mean": 53.1
+  },
+  "U": {
+   "n": 291,
+   "median": -78.0,
+   "p90": -49.0,
+   "mean": -78.2
+  }
+ },
+ "predictions": {
+  "RHO": {
+   "T1": true,
+   "T2": false,
+   "T3": true,
+   "T4": false
+  },
+  "U": {
+   "T1": true,
+   "T2": false,
+   "T3": false,
+   "T4": true
+  }
+ },
+ "verdict": {
+  "RHO": "NOT_ADOPTED",
+  "U": "NOT_ADOPTED"
+ },
+ "exploratory": {
+  "row_agreement_with_OLD_Q400B_modewindow": {
+   "R1": 0.8921,
+   "RHO": 0.7476,
+   "U": 0.4516
+  },
+  "flag_share": {
+   "OLD": 0.348,
+   "R1": 0.242,
+   "RHO": 0.111,
+   "U": 0.279
+  },
+  "OLD_flags_with_commanded_path_below_3mm": 0.0,
+  "commanded_path_mm_in_OLD_flags_quantiles": [
+   12.72,
+   20.09,
+   26.1,
+   35.09,
+   65.23
+  ],
+  "RHO_quantiles_dev": [
+   -0.092,
+   -0.023,
+   0.036,
+   0.205,
+   0.362,
+   0.45,
+   0.505
+  ],
+  "U_mm_quantiles_dev": [
+   4.5,
+   12.08,
+   20.4,
+   29.72,
+   43.89,
+   87.32,
+   107.77
+  ],
+  "fpr_matched_posthoc": {
+   "RHO": {
+    "threshold": 0.16,
+    "on": {
+     "TPR": 0.993,
+     "FPR": 0.307,
+     "AUROC": 0.849
+    },
+    "off": {
+     "TPR": 1.0,
+     "FPR": 0.937,
+     "AUROC": 0.541
+    },
+    "delay": {
+     "n": 295,
+     "median": -3.0,
+     "p90": 6.0,
+     "mean": -1.9
+    }
+   },
+   "U": {
+    "threshold": 80.0,
+    "on": {
+     "TPR": 0.566,
+     "FPR": 0.719,
+     "AUROC": 0.436
+    },
+    "off": {
+     "TPR": 0.596,
+     "FPR": 0.723,
+     "AUROC": 0.443
+    },
+    "delay": {
+     "n": 168,
+     "median": -81.5,
+     "p90": -58.69999999999999,
+     "mean": -83.5
+    }
+   }
+  }
+ }
+}

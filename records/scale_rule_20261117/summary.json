@@ -1,0 +1,142 @@
+{
+ "study": "scale_rule_20261117",
+ "prereg_sha256": "c32ae7643bbb41297b3a1a907c329d4c7567834186844468c206ada5562e72cc",
+ "robot_command_sent": false,
+ "theta": {
+  "eta_linear": 0.8002,
+  "eta_log": 0.798,
+  "th_linear": 1.0626,
+  "th_log": 0.0827,
+  "pick": "linear",
+  "threshold": 1.0626,
+  "share_below": 0.912
+ },
+ "stall_dev": {
+  "eta_linear": 0.6259,
+  "eta_log": 0.7469,
+  "th_linear": 0.2686,
+  "th_log": 0.0547,
+  "pick": "log",
+  "threshold": 0.0547,
+  "share_below": 0.228
+ },
+ "stall_holdout": {
+  "eta_linear": 0.6143,
+  "eta_log": 0.7168,
+  "th_linear": 0.2761,
+  "th_log": 0.0602,
+  "pick": "log",
+  "threshold": 0.0602,
+  "share_below": 0.223
+ },
+ "holdout_episodes": 1000,
+ "holdout_flip": 495,
+ "holdout_dev_threshold": {
+  "stall_only": {
+   "table": {
+    "1": {
+     "n": 199,
+     "flip_share": 0.739
+    },
+    "2": {
+     "n": 147,
+     "flip_share": 0.735
+    },
+    "3": {
+     "n": 124,
+     "flip_share": 0.742
+    },
+    "4": {
+     "n": 104,
+     "flip_share": 0.721
+    }
+   },
+   "chosen": {
+    "q0.95": 0,
+    "q0.9": 0
+   }
+  },
+  "evidence": {
+   "table": {
+    "1": {
+     "n": 92,
+     "flip_share": 0.935
+    },
+    "2": {
+     "n": 45,
+     "flip_share": 0.956
+    },
+    "3": {
+     "n": 32,
+     "flip_share": 1.0
+    },
+    "4": {
+     "n": 20,
+     "flip_share": 1.0
+    }
+   },
+   "chosen": {
+    "q0.95": 2,
+    "q0.9": 1
+   }
+  }
+ },
+ "holdout_own_threshold": {
+  "stall_only": {
+   "table": {
+    "1": {
+     "n": 203,
+     "flip_share": 0.734
+    },
+    "2": {
+     "n": 151,
+     "flip_share": 0.735
+    },
+    "3": {
+     "n": 129,
+     "flip_share": 0.736
+    },
+    "4": {
+     "n": 107,
+     "flip_share": 0.729
+    }
+   },
+   "chosen": {
+    "q0.95": 0,
+    "q0.9": 0
+   }
+  },
+  "evidence": {
+   "table": {
+    "1": {
+     "n": 97,
+     "flip_share": 0.928
+    },
+    "2": {
+     "n": 47,
+     "flip_share": 0.957
+    },
+    "3": {
+     "n": 34,
+     "flip_share": 1.0
+    },
+    "4": {
+     "n": 21,
+     "flip_share": 1.0
+    }
+   },
+   "chosen": {
+    "q0.95": 2,
+    "q0.9": 1
+   }
+  }
+ },
+ "predictions": {
+  "P1": true,
+  "P2": true,
+  "P3": true,
+  "P4": true,
+  "P5": true,
+  "P6": true
+ }
+}

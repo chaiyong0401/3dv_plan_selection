@@ -1,0 +1,11 @@
+stallmm_20261119 RUN_NOTE (2026-11-19 14:13, robot_command_sent: false)
+Frozen files verified after the run (sha256sum -c frozen.sha256: all OK). Wall 2.6 h (estimate was 1.7 h).
+Q400S25 (stall 2.5 mm = dev log-scale Otsu), 3 seeds, 600 scenes, paired vs Q400B (3 mm):
+  success 477 vs 475 (+0.33 pp, CI [-1.17, +1.83]); RMST 283.9 vs 284.2 (-0.2, CI [-5.0, +4.4])
+  per seed (new, ref): 157/160, 160/156, 160/159; same scene outcome 578/600
+  verdict EQUIVALENT (margins +-5 pp, +-25 steps)
+Q400S40 (4 mm), seed 21, 200 scenes: 155 vs 160 (-2.5 pp, CI [-6.5, +1.5]); RMST 287.7 vs 280.3 (+7.4, CI [-4.4, +20.3]); same 183/200
+  one seed, no verdict preregistered beyond M3; within seed spread and the ~11% numerical flip rate.
+Predictions: M1 hit, M2 hit, M3 hit.
+Consequence (preregistered): the paper states the procedure (log-scale Otsu of 24-step net displacement on rule-free rollouts);
+  the 2.5 mm run is the main result; 3 mm and 4 mm go to a sensitivity table.

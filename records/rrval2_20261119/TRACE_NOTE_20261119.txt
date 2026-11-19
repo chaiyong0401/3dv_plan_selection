@@ -1,0 +1,20 @@
+rrval2_20261119 - trace of the 154 vs 160 gap (CPU only, existing logs, 2026-11-19). robot_command_sent: false
+Post-hoc diagnosis, not a preregistered test. The CLOSE verdict is unchanged.
+
+1. The first difference is at step 0, not step 3. Policy command at step 0 is bit-identical in 6 of 8 cohorts; the SENT command
+   differs by <= 6e-8 (72 of 150 values). Runner arithmetic a_pol + (out - a_pol) is NOT the cause (float32 round trip changes 0 values).
+   The residual network output itself differs at ~1e-8. Likely cause (not verified): the residual runs in the bridge process
+   (python 3.8, torch 2.4.1+cu121) in the reference and in the runner process (python 3.10, torch 1.13.1+cu117) in RRB.
+   Contact physics amplifies it: tactile differs 7e-3 (of 9.7) after step 0, command 2e-5 at step 1, 1e-3 at step 3.
+   RRB, RRV, RRX3 (three runner runs) show bit-identical early differences -> deterministic, not random.
+2. In cohorts 76825 and 76875 the REFERENCE run (evq Q400B) itself has a first generator command different from the majority of
+   in-process runs with the same saved initial state (initial_state.npz identical in all runs). 4-5 of 41 runs share the same
+   alternate first command; RRB is on the majority branch. Cause of the two branches not identified (first observation differs;
+   images are not saved).
+3. Split:  6 cohorts with identical first policy command: RRB 114 vs ref 116 /150, same scenes 134/150.
+           2 cohorts where the reference is on the alternate branch: RRB 40 vs ref 44 /50, same scenes 44/50.
+4. Reading: no logic difference found in the runner. A 1e-8 command perturbation alone flips 16 of 150 scenes (net -2).
+   The prereg criterion "same in >= 195 of 200 scenes" cannot be met without bit-identical arithmetic; equivalence must be
+   judged on rates. Scene-level agreement of the same system is about 89%.
+5. Over all 11-16..11-19 runs (3 policy seeds, 556 cohort runs) 31 (5.6%) have a first command outside the majority for
+   their cohort (upper bound: includes arms whose first command legitimately differs).

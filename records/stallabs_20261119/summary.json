@@ -1,0 +1,54 @@
+{
+ "study": "stallabs_20261119",
+ "exploratory": true,
+ "robot_command_sent": false,
+ "unit": "mm (thresholds)",
+ "dev": {
+  "eta_linear": 0.8079,
+  "eta_log": 0.7039,
+  "th_linear": 24.6,
+  "th_log": 2.5,
+  "pick": "linear",
+  "threshold": 24.6,
+  "share_below": 0.829
+ },
+ "holdout": {
+  "eta_linear": 0.8021,
+  "eta_log": 0.6886,
+  "th_linear": 24.5,
+  "th_log": 2.9,
+  "pick": "linear",
+  "threshold": 24.5,
+  "share_below": 0.848
+ },
+ "check_P10_is_m": {
+  "dev_median_mm": 5.26,
+  "dev_p10_mm": 0.25,
+  "share_below_3mm_dev": 0.386,
+  "share_below_3mm_hold": 0.411
+ },
+ "dev_recursive": {
+  "first_split_mm": 24.6,
+  "second": {
+   "eta_linear": 0.7512,
+   "eta_log": 0.7464,
+   "th_linear": 7.5,
+   "th_log": 1.5,
+   "pick": "linear",
+   "threshold": 7.5,
+   "share_below": 0.691
+  }
+ },
+ "holdout_recursive": {
+  "first_split_mm": 24.5,
+  "second": {
+   "eta_linear": 0.7504,
+   "eta_log": 0.7185,
+   "th_linear": 7.5,
+   "th_log": 1.7,
+   "pick": "linear",
+   "threshold": 7.5,
+   "share_below": 0.713
+  }
+ }
+}

@@ -1,6 +1,6 @@
 # 새 컴퓨터에서 이어가기 (2026-11-19 기준)
 
-읽는 순서: 이 파일 → [`REVIEW_20261119.md`](REVIEW_20261119.md) (논리 검토, 결정 필요 항목) → [`REAL_ROBOT_MS_PLAN.md`](REAL_ROBOT_MS_PLAN.md) (실로봇 단계) → [`README.md`](README.md) (코드 지도).
+실험별 사전등록·결과는 [`records/`](records/README.md). 읽는 순서: 이 파일 → [`REVIEW_20261119.md`](REVIEW_20261119.md) (논리 검토, 결정 필요 항목) → [`REAL_ROBOT_MS_PLAN.md`](REAL_ROBOT_MS_PLAN.md) (실로봇 단계) → [`README.md`](README.md) (코드 지도).
 Claude Code를 쓰면 [`CLAUDE.md`](CLAUDE.md)가 자동으로 읽힌다.
 
 ## 1. 지금 상태
@@ -8,7 +8,8 @@ Claude Code를 쓰면 [`CLAUDE.md`](CLAUDE.md)가 자동으로 읽힌다.
 | 항목 | 상태 |
 |---|---|
 | 시뮬레이터 (키 USB) | 주장 C1–C4 근거 확보. 본 시스템 Q400B 475 / 600, ER3 525 / 600 |
-| 실로봇 실행 코드 (`realrobot/`) | CPU 시험 통과. 시뮬레이터 재현은 "근접" (154 대 160, 경계값). `FrankaRobot`은 자리만 있음 |
+| 실로봇 실행 코드 (`realrobot/`) | CPU 시험 통과. 시뮬레이터 재현 154 대 160은 수치 증폭으로 확인 (논리 차이 없음, `records/rrval2_20261119/TRACE_NOTE_20261119.txt`). `FrankaRobot`은 자리만 있음 |
+| 정지 기준 | 순 이동 유지. 대안 정의 4개 기각. 절차 값 2.5 mm가 3 mm와 동등 (`records/`) |
 | 실로봇 실험 | 시작 전. 로봇 명령을 보낸 적 없음 |
 | 논문 | 방법 절 초안 v1 (갱신 필요, REVIEW §5) |
 
@@ -63,7 +64,7 @@ cd realrobot && python test_realrobot_20261119.py     # ALL OK 가 나와야 함
 
 ## 4. 다음 순서
 
-1. REVIEW §3의 남은 결정 2건 (D3 3 mm 설명, D4 재현 차이 추적). D1·D2는 11-19에 결정됨.
+1. D1–D4는 11-19에 정리됨 (REVIEW §3, §6). 남은 결정: 논문 본문 숫자를 3 mm(475)로 둘지 2.5 mm(477)로 통일할지.
 2. 실로봇 정보 확정 (PLAN §8: 제어기, GPU, 소켓 치수·공차, 성공 감지, 리셋, 원격 조작).
 3. PLAN §4 단계 0–1: `FrankaRobot` 작성, 지연 측정, 명령 재생으로 기록 재현.
 4. 시연 50 → 1차 생성기 → 넘겨받기 수집 200–400 → 생성기 재학습 + 잔차 → **자율 rollout 400 (Q용)** → Q → 평가 480회.

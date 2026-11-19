@@ -1,0 +1,35 @@
+{
+ "study": "stallc_20261119",
+ "frozen_before_execution": true,
+ "robot_command_sent": false,
+ "kind": "offline, CPU, existing logs only",
+ "question": "Does a constant-free procedure (Otsu on contact-only rows) give a stall threshold that reproduces the decisions of the hand-set 3 mm rule and keeps its mode-test quality?",
+ "definition": {
+  "window": "24 steps (one plan length), net hand displacement d24 = |p_t - p_(t-24)| as recorded by the server (verifier_P[:,10])",
+  "contact_feature": "g = mean over the same 24 steps of |C8D[0:3] - C8D[0:3] at episode step 0| (tactile force summary, baseline = episode start)",
+  "contact_threshold": "scale_rule_20261117 rule() (Otsu, linear vs log picked by eta) on g over all pre-success refresh rows",
+  "stall_threshold": "the same rule() on d24 over rows with g > contact_threshold",
+  "stall": "g > contact_threshold AND d24 < stall_threshold",
+  "free_constants": "none (M = 2 and the 24-step window are unchanged)"
+ },
+ "data": {
+  "dev": "unify0_20261116 NORULE, seeds 20260921-23, 8 cohorts each (thresholds are fitted here)",
+  "holdout": "qdata_20261116 arms Q200_OLD Q400_OLD Q200_NV Q400_NV QFULL_NV, seed 20260921",
+  "agreement": "Q400B seeds 21 (evq_20261117), 22-23 (b2_20261117): pre-success refresh rows, thresholds from dev",
+  "mode_test": "same episodes and episode-level definition as resoff3_20261119 (first stall before 90 deg rotation; flip = wrong mode), per-step d24 from ee_pos and per-step 24-step mean of g; arms Q400B (on) and Q400B0 (off)"
+ },
+ "predictions": {
+  "S1": "dev stall_threshold in [2.0, 4.5] mm",
+  "S2": "holdout stall_threshold within +-30% of dev and same scale pick (stall threshold)",
+  "S3": "row-level stall flag agreement new vs old (d24 < 3 mm) >= 0.95 on Q400B",
+  "S4": "on arm: AUROC_new >= AUROC_old - 0.02, FPR_new <= FPR_old + 0.03, TPR_new >= TPR_old - 0.05",
+  "S5": "FPR_off - FPR_on >= 0.30 under the new criterion"
+ },
+ "verdict": {
+  "SAME_DECISIONS": "S1-S5 all true: adopt the procedure, existing simulation results stand without rerun",
+  "ADOPTABLE_NEEDS_RERUN": "S1, S2, S4, S5 true and S3 false: procedure is sound but decisions differ; closed-loop 3-seed rerun needs user approval",
+  "NOT_ADOPTED": "otherwise: recorded as is, no rerun of this gate without changes and user approval"
+ },
+ "expectation": "S1 uncertain (about even odds); if S1 holds the rest should follow",
+ "also_reported_exploratory": ["contact threshold and share of contact rows", "agreement of the M=2 consecutive flag", "rule() on all rows (no contact condition) for reference"]
+}

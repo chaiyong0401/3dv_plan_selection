@@ -1,0 +1,9 @@
+{"id":"rrval2_20261119","frozen_before_execution":true,"robot_command_sent":false,
+"user_decision":"2026-11-19 00:xx: user asked to run the reproduction check after C1 (resoff3_20261119).",
+"question":"Does the updated real-robot runner (realrobot/policy_core.py with the stallr server module, blocking-only rule k 999 / fallback 2, 3 mm stall, Q400 ensemble, continuity 0.02, delay 2, sim residual; lockstep, in its own process) reproduce the current simulation system Q400B?",
+"arm":"RRB = rr_server.py --config rr_RRB.json (lockstep) + eval_rdp_bridge_usb_keyed_rrval_20261116.py (bridge residual off; residual inside the runner = SimResidual residual_conv.pt)",
+"reference":"Q400B seed 20260921, evq_20261117/eval, 160/200",
+"criteria":{"REPRODUCED":"per-scene success identical in >= 195 of 200 scenes and |success - 160| <= 3","CLOSE":"|success - 160| <= 6","DIFFERENT":"otherwise -> report the first step where action_policy differs by > 1e-4 before anything else"},
+"expectation":"CLOSE (the 11-16 validation of the same runner with the old rule gave 168 vs 169, 185/200 same scenes, first command difference at step 3 of 1e-3)",
+"also_reported":"first step and cohort where action_policy differs from Q400B by > 1e-4; RMST of both",
+"order":"starts after resoff3_20261119/job.done; one GPU sim at a time"}

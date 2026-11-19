@@ -1,0 +1,18 @@
+stallu_20261119 - result (2026-11-19, offline, CPU). robot_command_sent: false
+prereg.json sha a8d6f770..., run.py sha 74884315... (frozen.sha256). Verdict: RHO NOT_ADOPTED, U NOT_ADOPTED. Recorded as is; no rerun.
+
+RHO (realized / commanded along the command, 24 steps): rule() picked log, threshold 0.0079 dev / 0.0080 holdout (T1 true).
+  on: TPR 0.646 FPR 0.099 AUROC 0.773 (OLD 1.0 / 0.300 / 0.871) -> T2 false. off FPR 0.644 -> T3 true (0.545). delay vs OLD median +52.5, p90 +109 -> T4 false.
+  Too strict: the log split separates "fully jammed" from the rest.
+U (accumulated unrealized command, mm): rule() picked linear, 50.3 / 47.9 mm (T1 true). on: TPR 0.98 FPR 0.997 AUROC 0.458 -> T2 false, T3 false, T4 true.
+  U grows with command size, so free fast motion is flagged (realization gain is only ~0.43 even in free motion).
+
+Exploratory (not a verdict):
+- R1 (11-17 ratio d24/|sum c| < 0.0547): on TPR 0.953 FPR 0.145 AUROC 0.924; off FPR 0.812; delay median +3, p90 +25. Better discrimination than OLD offline,
+  yet closed loop was -7 pp (1 seed): 4.7% of wrong-mode episodes never flagged in the window and the late tail.
+- RHO linear-scale Otsu threshold 0.205 dev / 0.204 holdout (eta 0.790 vs log 0.822); NOT evaluated on the mode test.
+- Post hoc FPR-matched RHO threshold 0.16: on TPR 0.993 FPR 0.307 AUROC 0.849, off FPR 0.937, delay median -3, p90 +6 -> equivalent to the 3 mm rule.
+- Share of OLD stall flags with commanded path < 3 mm in the window: 0.0 (commanded path in OLD flags 12.7-65 mm, 5-95%).
+  "The generator stopped on purpose" does not occur in these logs; that argued advantage of a ratio has no support here.
+- Row agreement with OLD (mode window, Q400B): R1 0.892, RHO 0.748, U 0.452.
+Reading: the ratio signal carries the mode information; what fails is the threshold procedure (eta-picked log Otsu is too strict for a ratio).

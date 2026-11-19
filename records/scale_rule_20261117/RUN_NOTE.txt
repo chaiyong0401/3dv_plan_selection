@@ -1,0 +1,1 @@
+2026-11-17 first run crashed on a leftover placeholder line (holdout_3mm_ref) before any output; line removed, no result seen

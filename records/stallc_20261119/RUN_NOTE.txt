@@ -1,0 +1,3 @@
+2026-11-19 result: NOT_ADOPTED (S1 false, S2 true, S3 false, S4 false, S5 false). Recorded as is; no rerun.
+Erratum (display only): summary.json "stall_threshold_mm" is multiplied by 1000 twice (22900 = 22.9 mm, 23100 = 23.1 mm).
+S1 is false with the correct value too (22.9 mm is outside [2.0, 4.5]); S2 is a relative comparison and unaffected.

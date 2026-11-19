@@ -1,0 +1,80 @@
+{
+ "study": "stallmm_20261119",
+ "robot_command_sent": false,
+ "Q400S25": {
+  "scenes": 600,
+  "success": 477,
+  "reference": 475,
+  "diff_pp": 0.33,
+  "diff_pp_ci": [
+   -1.17,
+   1.83
+  ],
+  "rmst": 283.9,
+  "rmst_reference": 284.2,
+  "rmst_diff": -0.2,
+  "rmst_diff_ci": [
+   -5.0,
+   4.4
+  ],
+  "same_scenes": 578,
+  "flip": [
+   200,
+   198,
+   297
+  ],
+  "nonflip": [
+   277,
+   277,
+   303
+  ],
+  "per_seed": [
+   [
+    157,
+    160
+   ],
+   [
+    160,
+    156
+   ],
+   [
+    160,
+    159
+   ]
+  ],
+  "verdict": "EQUIVALENT"
+ },
+ "predictions": {
+  "M1": true,
+  "M2": true,
+  "M3": true
+ },
+ "Q400S40_seed21": {
+  "scenes": 200,
+  "success": 155,
+  "reference": 160,
+  "diff_pp": -2.5,
+  "diff_pp_ci": [
+   -6.5,
+   1.5
+  ],
+  "rmst": 287.7,
+  "rmst_reference": 280.3,
+  "rmst_diff": 7.4,
+  "rmst_diff_ci": [
+   -4.4,
+   20.3
+  ],
+  "same_scenes": 183,
+  "flip": [
+   67,
+   68,
+   99
+  ],
+  "nonflip": [
+   88,
+   92,
+   101
+  ]
+ }
+}

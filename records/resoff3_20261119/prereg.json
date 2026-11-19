@@ -1,0 +1,9 @@
+{"study":"resoff3_20261119","frozen_before_execution":true,
+"follows":"resoff_cur_20261117 (seed 20260921, 200 eps): corrector off FPR 0.921 / AUROC 0.552 / success 72 vs on 0.337 / 0.869 / 160. C1 (corrector = mode test) is the core novelty and had one seed. User approved the 3-seed expansion (11-18 night).",
+"question":"Over 3 seeds, does the corrector turn the stall into a wrong-mode test (lower false stall on non-flip, AUROC up) and raise success / cut time?",
+"arms":{"off":"Q400B0 = Q400B with --delta_mode off; new runs seeds 20260922, 20260923; seed 20260921 reused from resoff_cur_20261117/eval","on":"Q400B: evq_20261117 (s21) + b2_20261117 (s22, s23)"},
+"n":600,"pairing":"same seed/cohort/episode",
+"definitions":"as resoff_cur_20261117: stall = 24-step EE displacement < 3 mm; window = before heading change > 90 deg and before success; TPR on flip, FPR on non-flip, AUROC with score = -(first stall step)",
+"co_primary":["success, paired bootstrap 95% CI","RMST at 600, paired CI"],
+"predictions":{"R1":"FPR(on) <= FPR(off) - 0.10 (pooled) and FPR(on) < FPR(off) in every seed","R2":"TPR(on) >= TPR(off) - 0.05","R3":"AUROC(on) >= AUROC(off) + 0.05","R4":"RMST on - off CI upper < 0","R5":"success on - off CI lower > 0"},
+"robot_command_sent":false}
