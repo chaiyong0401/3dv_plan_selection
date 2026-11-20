@@ -1,0 +1,13 @@
+corrq_20261120 RUN_NOTE (2026-11-20, offline CPU, robot_command_sent: false). Frozen files verified after the run.
+Verdict PARTIAL: G1 hit, G2 hit, G3 miss, G4 miss.
+Mode test (3 seeds, 600 scenes): OFF TPR 1.0 FPR 0.898 AUROC 0.572 | RES 1.0/0.300/0.871 | B2 1.0/0.300/0.870 | ER3 1.0/0.323/0.867 | DZ 0.997/0.300/0.870.
+ - B2 and DZ have exactly RES's pre-switch stall rate (they differ only after the first switch), as warned in prereg limits: the five sets give two distinct qualities (OFF vs the residual family), plus ER3 slightly different.
+ - Exploratory RZ0 (rz output zero, seed 21, 200 scenes): FPR 0.495, between OFF and RES -> one intermediate point, one seed.
+Non-flip scenes, success given no stall: 31/31 (OFF), 212/212 (RES, B2, DZ), 205/205 (ER3) = 100% in every set.
+Non-flip scenes, success given a stall: OFF 96/272 (0.353), RES 65/91 (0.714), B2 57/91 (0.626), ER3 68/98 (0.694), DZ 60/91 (0.659).
+Mediation errors: RES -0.061, B2 -0.031, ER3 -0.059, DZ -0.042 (G3 limit 0.05: two misses, small); OFF +0.288 (G4 miss, large).
+Reading: the stall is not the only channel. With the corrector off, a right-mode stall is recovered only 35% of the time; with it on, 63-71%. So the corrector acts twice: it lowers the false-stall rate (0.90 -> 0.30) and it raises recovery after a false stall.
+ Note on G3: the leave-one-out pool for each corrector-on set includes OFF, which pulls p0 down; this was the preregistered definition and is reported as a miss.
+G5 (reported only): Spearman(AUROC, success) = 0.05 across the five sets: among corrector-on sets AUROC is the same while success differs by flip-scene gains after the switch (B2 254, ER3 252, DZ 226, RES 198 of 297).
+Consequence (preregistered, PARTIAL): report the across-corrector table only. No 'stall is the channel' sentence.
+Usable facts for the paper: (1) TPR ~1 for every corrector: no corrector removes wrong-mode stalls; (2) no-stall right-mode scenes succeed 100% in every set; (3) the corrector-quality axis is thin in existing data (OFF, RZ0 one seed, residual family).

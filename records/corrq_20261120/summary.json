@@ -1,0 +1,251 @@
+{
+ "study": "corrq_20261120",
+ "robot_command_sent": false,
+ "mode_test": {
+  "OFF": {
+   "n": 600,
+   "TPR": 1.0,
+   "FPR": 0.898,
+   "AUROC": 0.572,
+   "success": 213,
+   "succ_flip": 86,
+   "succ_nonflip": 127,
+   "n_nonflip": 303,
+   "rmst": 482.6,
+   "nonflip_succ_given_nostall": [
+    31,
+    31
+   ],
+   "nonflip_succ_given_stall": [
+    96,
+    272
+   ]
+  },
+  "RES": {
+   "n": 600,
+   "TPR": 1.0,
+   "FPR": 0.3,
+   "AUROC": 0.871,
+   "success": 475,
+   "succ_flip": 198,
+   "succ_nonflip": 277,
+   "n_nonflip": 303,
+   "rmst": 284.2,
+   "nonflip_succ_given_nostall": [
+    212,
+    212
+   ],
+   "nonflip_succ_given_stall": [
+    65,
+    91
+   ]
+  },
+  "B2": {
+   "n": 600,
+   "TPR": 1.0,
+   "FPR": 0.3,
+   "AUROC": 0.87,
+   "success": 523,
+   "succ_flip": 254,
+   "succ_nonflip": 269,
+   "n_nonflip": 303,
+   "rmst": 260.5,
+   "nonflip_succ_given_nostall": [
+    212,
+    212
+   ],
+   "nonflip_succ_given_stall": [
+    57,
+    91
+   ]
+  },
+  "ER3": {
+   "n": 600,
+   "TPR": 1.0,
+   "FPR": 0.323,
+   "AUROC": 0.867,
+   "success": 525,
+   "succ_flip": 252,
+   "succ_nonflip": 273,
+   "n_nonflip": 303,
+   "rmst": 260.3,
+   "nonflip_succ_given_nostall": [
+    205,
+    205
+   ],
+   "nonflip_succ_given_stall": [
+    68,
+    98
+   ]
+  },
+  "DZ": {
+   "n": 600,
+   "TPR": 0.997,
+   "FPR": 0.3,
+   "AUROC": 0.87,
+   "success": 498,
+   "succ_flip": 226,
+   "succ_nonflip": 272,
+   "n_nonflip": 303,
+   "rmst": 264.6,
+   "nonflip_succ_given_nostall": [
+    212,
+    212
+   ],
+   "nonflip_succ_given_stall": [
+    60,
+    91
+   ]
+  }
+ },
+ "mediation": {
+  "RES": {
+   "p1": 1.0,
+   "p0": 0.509,
+   "predicted": 0.853,
+   "actual": 0.914,
+   "error": -0.061
+  },
+  "B2": {
+   "p1": 1.0,
+   "p0": 0.524,
+   "predicted": 0.857,
+   "actual": 0.888,
+   "error": -0.031
+  },
+  "ER3": {
+   "p1": 1.0,
+   "p0": 0.51,
+   "predicted": 0.842,
+   "actual": 0.901,
+   "error": -0.059
+  },
+  "DZ": {
+   "p1": 1.0,
+   "p0": 0.518,
+   "predicted": 0.855,
+   "actual": 0.898,
+   "error": -0.042
+  },
+  "OFF": {
+   "p1": 1.0,
+   "p0": 0.674,
+   "predicted": 0.707,
+   "actual": 0.419,
+   "error": 0.288
+  }
+ },
+ "predictions": {
+  "G1": true,
+  "G2": true,
+  "G3": false,
+  "G4": false
+ },
+ "G5_spearman_auroc_success": 0.051,
+ "verdict": "PARTIAL",
+ "exploratory": {
+  "RZ0": {
+   "n": 200,
+   "TPR": 1.0,
+   "FPR": 0.495,
+   "AUROC": 0.782,
+   "success": 134,
+   "succ_flip": 64,
+   "succ_nonflip": 70,
+   "n_nonflip": 101,
+   "rmst": 338.7,
+   "nonflip_succ_given_nostall": [
+    51,
+    51
+   ],
+   "nonflip_succ_given_stall": [
+    19,
+    50
+   ]
+  },
+  "LS": {
+   "n": 200,
+   "TPR": 1.0,
+   "FPR": 0.307,
+   "AUROC": 0.869,
+   "success": 170,
+   "succ_flip": 85,
+   "succ_nonflip": 85,
+   "n_nonflip": 101,
+   "rmst": 268.5,
+   "nonflip_succ_given_nostall": [
+    70,
+    70
+   ],
+   "nonflip_succ_given_stall": [
+    15,
+    31
+   ]
+  },
+  "LINSGN": {
+   "n": 600,
+   "TPR": 1.0,
+   "FPR": 0.356,
+   "AUROC": 0.856,
+   "success": 507,
+   "succ_flip": 244,
+   "succ_nonflip": 263,
+   "n_nonflip": 303,
+   "rmst": 272.6,
+   "nonflip_succ_given_nostall": [
+    195,
+    195
+   ],
+   "nonflip_succ_given_stall": [
+    68,
+    108
+   ]
+  },
+  "S25": {
+   "n": 600,
+   "TPR": 1.0,
+   "FPR": 0.267,
+   "AUROC": 0.896,
+   "success": 477,
+   "succ_flip": 200,
+   "succ_nonflip": 277,
+   "n_nonflip": 303,
+   "rmst": 283.9,
+   "nonflip_succ_given_nostall": [
+    222,
+    222
+   ],
+   "nonflip_succ_given_stall": [
+    55,
+    81
+   ]
+  }
+ },
+ "per_seed_FPR": {
+  "OFF": [
+   0.921,
+   0.901,
+   0.871
+  ],
+  "RES": [
+   0.337,
+   0.337,
+   0.228
+  ],
+  "B2": [
+   0.337,
+   0.337,
+   0.228
+  ],
+  "ER3": [
+   0.327,
+   0.356,
+   0.287
+  ],
+  "DZ": [
+   0.337,
+   0.337,
+   0.228
+  ]
+ }
+}
