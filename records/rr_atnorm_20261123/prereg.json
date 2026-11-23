@@ -1,0 +1,20 @@
+{
+ "id": "rr_atnorm_20261123",
+ "written": "2026-11-23 evening, before any reconstruction number was computed. Known already: normalizer ranges (action y scale x0.735, tactile dims 0 and 2 x0.71 / x0.57 under N1).",
+ "question": "The LDP training code hands its own normalizer to the fixed AT. With the 45 demonstrations + 27 LEAVE segments (ldp_tk, ldp_tkL) the AT therefore runs with statistics N1 it was not trained with. Does the fixed AT (at_20261120) still reconstruct the action chunks - of the demonstrations and of the LEAVE segments - under N1, and would the AT's own statistics N0 be better or worse?",
+ "arms": {"N0_at": "action + tactile statistics of the 45 demonstrations", "N1_tkL": "statistics of 45 demonstrations + 27 LEAVE (running training)", "actN1_tacN0 / actN0_tacN1": "descriptive split of the two changes"},
+ "data": "low-dimensional arrays only (action 6, contact_8d 8), copied read-only from the 5090: tkL zarr (45 + 27) and tk_ds segments (held LEAVE 6, ALIGN train + held). Chunks sampled by the AT's own dataset class and config (horizon 32).",
+ "measure": "mean absolute error between raw command and AT encode -> decode (with tactile temporal condition), in raw command units; all 6 dims (err_all) and y (err_y). Reference REF = demo45 under N0 (the AT's in-distribution level).",
+ "criteria": {
+  "demo_keep": "N1 keeps the demonstrations if err_all(demo45, N1) <= 1.25 x REF_all and err_y(demo45, N1) <= 1.25 x REF_y",
+  "leave_ok": "an arm is OK on LEAVE if, on leave_train27 AND leave_held6, err_all <= 1.5 x REF_all and err_y <= 1.5 x REF_y; BAD if either exceeds 2.5 x; between = MARGINAL",
+  "decision": "N1 demo_keep and leave OK -> keep the running training as it is. N1 not OK and N0 OK -> recommend restart with at_normalizer_path (N0). Both BAD -> recommend retraining the AT on demonstrations + LEAVE. MARGINAL cases are reported with numbers and no recommendation is forced."
+ },
+ "limits_written_in_advance": [
+  "Reconstruction with the true chunk as encoder input is an upper bound: at run time the latent comes from the LDP.",
+  "The LEAVE training segments are not AT training data in either arm, so 'train' and 'held' LEAVE are both unseen for the AT.",
+  "Tactile effect on the decoder is small in earlier measurements; the split arms are descriptive only.",
+  "One AT, one seed for the posterior sample (kl weight 1e-6, sample noise small)."
+ ],
+ "robot_command_sent": false, "gpu": "none (CPU)"
+}
