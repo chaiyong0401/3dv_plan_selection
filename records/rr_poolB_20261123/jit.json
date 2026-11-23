@@ -1,0 +1,480 @@
+{
+ "tag": "jit",
+ "ckpt": "/home/dyros-recruit/mcy_ws/real_ms_4070/data/poolB_20261123/ckpt_jit/epoch100_backup.ckpt",
+ "legacy_clip": true,
+ "rows": [
+  {
+   "scene": "125729",
+   "group": "W_unseen",
+   "correct": "-y",
+   "lift": 0,
+   "share": 0.0
+  },
+  {
+   "scene": "131004",
+   "group": "W_train",
+   "correct": "-y",
+   "lift": 0,
+   "share": 0.0
+  },
+  {
+   "scene": "131219",
+   "group": "R",
+   "correct": "-y",
+   "lift": 39,
+   "share": 0.3046875
+  },
+  {
+   "scene": "131525",
+   "group": "R",
+   "correct": "-y",
+   "lift": 0,
+   "share": 0.0
+  },
+  {
+   "scene": "133059",
+   "group": "W_unseen",
+   "correct": "+y",
+   "lift": 0,
+   "share": 0.0
+  },
+  {
+   "scene": "133200",
+   "group": "R",
+   "correct": "+y",
+   "lift": 0,
+   "share": 0.0
+  },
+  {
+   "scene": "133257",
+   "group": "R",
+   "correct": "+y",
+   "lift": 0,
+   "share": 0.0
+  },
+  {
+   "scene": "133343",
+   "group": "W_train",
+   "correct": "+y",
+   "lift": 26,
+   "share": 0.203125
+  },
+  {
+   "scene": "135322",
+   "group": "R",
+   "correct": "+y",
+   "lift": 2,
+   "share": 0.015625
+  },
+  {
+   "scene": "135405",
+   "group": "W_train",
+   "correct": "+y",
+   "lift": 2,
+   "share": 0.015625
+  },
+  {
+   "scene": "135501",
+   "group": "W_train",
+   "correct": "+y",
+   "lift": 21,
+   "share": 0.1640625
+  },
+  {
+   "scene": "135658",
+   "group": "R",
+   "correct": "+y",
+   "lift": 0,
+   "share": 0.0
+  },
+  {
+   "scene": "135826",
+   "group": "R",
+   "correct": "+y",
+   "lift": 0,
+   "share": 0.0
+  },
+  {
+   "scene": "140025",
+   "group": "W_train",
+   "correct": "+y",
+   "lift": 1,
+   "share": 0.0078125
+  },
+  {
+   "scene": "140207",
+   "group": "W_train",
+   "correct": "+y",
+   "lift": 4,
+   "share": 0.03125
+  },
+  {
+   "scene": "140334",
+   "group": "R",
+   "correct": "+y",
+   "lift": 3,
+   "share": 0.0234375
+  },
+  {
+   "scene": "142741",
+   "group": "R",
+   "correct": "+y",
+   "lift": 0,
+   "share": 0.0
+  },
+  {
+   "scene": "142839",
+   "group": "W_train",
+   "correct": "+y",
+   "lift": 5,
+   "share": 0.0390625
+  },
+  {
+   "scene": "143212",
+   "group": "W_train",
+   "correct": "+y",
+   "lift": 0,
+   "share": 0.0
+  },
+  {
+   "scene": "143429",
+   "group": "R",
+   "correct": "+y",
+   "lift": 0,
+   "share": 0.0
+  },
+  {
+   "scene": "143555",
+   "group": "R",
+   "correct": "+y",
+   "lift": 0,
+   "share": 0.0
+  },
+  {
+   "scene": "143638",
+   "group": "R",
+   "correct": "+y",
+   "lift": 0,
+   "share": 0.0
+  },
+  {
+   "scene": "143720",
+   "group": "R",
+   "correct": "+y",
+   "lift": 0,
+   "share": 0.0
+  },
+  {
+   "scene": "143909",
+   "group": "W_train",
+   "correct": "+y",
+   "lift": 12,
+   "share": 0.09375
+  },
+  {
+   "scene": "143957",
+   "group": "R",
+   "correct": "+y",
+   "lift": 0,
+   "share": 0.0
+  },
+  {
+   "scene": "144333",
+   "group": "W_train",
+   "correct": "+y",
+   "lift": 5,
+   "share": 0.0390625
+  },
+  {
+   "scene": "144414",
+   "group": "R",
+   "correct": "+y",
+   "lift": 0,
+   "share": 0.0
+  },
+  {
+   "scene": "144531",
+   "group": "R",
+   "correct": "+y",
+   "lift": 0,
+   "share": 0.0
+  },
+  {
+   "scene": "144617",
+   "group": "R",
+   "correct": "+y",
+   "lift": 0,
+   "share": 0.0
+  },
+  {
+   "scene": "144709",
+   "group": "R",
+   "correct": "+y",
+   "lift": 0,
+   "share": 0.0
+  },
+  {
+   "scene": "144751",
+   "group": "R",
+   "correct": "+y",
+   "lift": 0,
+   "share": 0.0
+  },
+  {
+   "scene": "144929",
+   "group": "W_unseen",
+   "correct": "+y",
+   "lift": 1,
+   "share": 0.0078125
+  },
+  {
+   "scene": "145426",
+   "group": "W_train",
+   "correct": "+y",
+   "lift": 0,
+   "share": 0.0
+  },
+  {
+   "scene": "150228",
+   "group": "R",
+   "correct": "+y",
+   "lift": 0,
+   "share": 0.0
+  },
+  {
+   "scene": "150433",
+   "group": "W_train",
+   "correct": "+y",
+   "lift": 0,
+   "share": 0.0
+  },
+  {
+   "scene": "150630",
+   "group": "R",
+   "correct": "+y",
+   "lift": 0,
+   "share": 0.0
+  },
+  {
+   "scene": "150843",
+   "group": "W_train",
+   "correct": "+y",
+   "lift": 3,
+   "share": 0.0234375
+  },
+  {
+   "scene": "150931",
+   "group": "R",
+   "correct": "+y",
+   "lift": 0,
+   "share": 0.0
+  },
+  {
+   "scene": "151140",
+   "group": "W_train",
+   "correct": "-y",
+   "lift": 0,
+   "share": 0.0
+  },
+  {
+   "scene": "151259",
+   "group": "W_train",
+   "correct": "-y",
+   "lift": 0,
+   "share": 0.0
+  },
+  {
+   "scene": "151341",
+   "group": "W_train",
+   "correct": "-y",
+   "lift": 0,
+   "share": 0.0
+  },
+  {
+   "scene": "151422",
+   "group": "W_train",
+   "correct": "-y",
+   "lift": 0,
+   "share": 0.0
+  },
+  {
+   "scene": "151517",
+   "group": "W_unseen",
+   "correct": "-y",
+   "lift": 6,
+   "share": 0.046875
+  },
+  {
+   "scene": "151813",
+   "group": "W_train",
+   "correct": "-y",
+   "lift": 0,
+   "share": 0.0
+  },
+  {
+   "scene": "151858",
+   "group": "W_train",
+   "correct": "-y",
+   "lift": 0,
+   "share": 0.0
+  },
+  {
+   "scene": "151950",
+   "group": "R",
+   "correct": "-y",
+   "lift": 0,
+   "share": 0.0
+  },
+  {
+   "scene": "152031",
+   "group": "W_train",
+   "correct": "-y",
+   "lift": 0,
+   "share": 0.0
+  },
+  {
+   "scene": "152117",
+   "group": "W_train",
+   "correct": "-y",
+   "lift": 0,
+   "share": 0.0
+  },
+  {
+   "scene": "152157",
+   "group": "W_train",
+   "correct": "-y",
+   "lift": 0,
+   "share": 0.0
+  },
+  {
+   "scene": "152314",
+   "group": "W_train",
+   "correct": "-y",
+   "lift": 0,
+   "share": 0.0
+  },
+  {
+   "scene": "152357",
+   "group": "W_unseen",
+   "correct": "-y",
+   "lift": 0,
+   "share": 0.0
+  },
+  {
+   "scene": "153122",
+   "group": "R",
+   "correct": "+y",
+   "lift": 0,
+   "share": 0.0
+  },
+  {
+   "scene": "153241",
+   "group": "R",
+   "correct": "+y",
+   "lift": 0,
+   "share": 0.0
+  },
+  {
+   "scene": "153421",
+   "group": "R",
+   "correct": "+y",
+   "lift": 0,
+   "share": 0.0
+  },
+  {
+   "scene": "153855",
+   "group": "R",
+   "correct": "+y",
+   "lift": 0,
+   "share": 0.0
+  },
+  {
+   "scene": "154023",
+   "group": "W_train",
+   "correct": "+y",
+   "lift": 14,
+   "share": 0.109375
+  },
+  {
+   "scene": "154115",
+   "group": "W_unseen",
+   "correct": "+y",
+   "lift": 0,
+   "share": 0.0
+  },
+  {
+   "scene": "154204",
+   "group": "W_train",
+   "correct": "+y",
+   "lift": 0,
+   "share": 0.0
+  },
+  {
+   "scene": "154241",
+   "group": "R",
+   "correct": "+y",
+   "lift": 1,
+   "share": 0.0078125
+  },
+  {
+   "scene": "154334",
+   "group": "W_train",
+   "correct": "+y",
+   "lift": 0,
+   "share": 0.0
+  },
+  {
+   "scene": "154537",
+   "group": "W_train",
+   "correct": "+y",
+   "lift": 3,
+   "share": 0.0234375
+  },
+  {
+   "scene": "154651",
+   "group": "R",
+   "correct": "+y",
+   "lift": 0,
+   "share": 0.0
+  },
+  {
+   "scene": "154733",
+   "group": "R",
+   "correct": "+y",
+   "lift": 0,
+   "share": 0.0
+  },
+  {
+   "scene": "154911",
+   "group": "R",
+   "correct": "+y",
+   "lift": 0,
+   "share": 0.0
+  },
+  {
+   "scene": "210725_night",
+   "group": "W_unseen",
+   "correct": "-y",
+   "lift": [
+    0,
+    0,
+    0
+   ],
+   "share": 0.0,
+   "steps": 900
+  },
+  {
+   "scene": "210845_night",
+   "group": "W_unseen",
+   "correct": "-y",
+   "lift": [
+    0,
+    0,
+    0
+   ],
+   "share": 0.0,
+   "steps": 900
+  }
+ ],
+ "robot_command_sent": false
+}
